@@ -1,0 +1,46 @@
+name: "Livvie Code Review"
+description: "AI code review with native GitHub suggestion blocks and REQUEST_CHANGES support. Bring your own LLM key."
+author: "4itworks"
+branding:
+  icon: "eye"
+  color: "blue"
+
+inputs:
+  github-token:
+    description: "GitHub token for posting PR reviews."
+    required: true
+    default: "${{ github.token }}"
+  llm-api-key:
+    description: "API key for your LLM provider."
+    required: true
+  llm-base-url:
+    description: "Base URL for OpenAI-compatible API."
+    required: true
+    default: "https://openrouter.ai/api/v1"
+  model:
+    description: "Model name (e.g. z-ai/glm-5.2, anthropic/claude-sonnet-4)."
+    required: true
+  review-instructions-file:
+    description: "Repository file with extra review instructions."
+    required: false
+    default: ".github/code-reviewer.md"
+  max-diff-size:
+    description: "Maximum diff size in characters sent to the model."
+    required: false
+    default: "50000"
+  max-output-tokens:
+    description: "Maximum tokens for the LLM response."
+    required: false
+    default: "16000"
+  request-changes-on-high:
+    description: "Post REQUEST_CHANGES when high-severity findings exist."
+    required: false
+    default: "true"
+  max-comments:
+    description: "Maximum inline comments to post."
+    required: false
+    default: "25"
+
+runs:
+  using: "node20"
+  main: "dist/index.js"

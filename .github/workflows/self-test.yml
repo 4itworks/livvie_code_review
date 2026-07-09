@@ -1,0 +1,29 @@
+name: Self Test
+
+on:
+  pull_request:
+    types: [opened, ready_for_review]
+    paths:
+      - "src/**"
+      - "action.yml"
+      - "prompts/**"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  self-test:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: ./
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          llm-api-key: ${{ secrets.LLM_API_KEY }}
+          llm-base-url: ${{ secrets.LLM_BASE_URL }}
+          model: ${{ secrets.LLM_MODEL }}
