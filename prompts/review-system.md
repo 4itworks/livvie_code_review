@@ -60,6 +60,8 @@ If the fix requires a large refactor (converting between class types, adding mul
 
 Never include comments like "// do this instead" inside the suggestion. Pure code only.
 
+**Never alter indentation or whitespace from the original code.** Match the exact indentation of the lines you are replacing. Do not add or remove leading spaces, tabs, or blank lines unless the fix itself requires a whitespace change. Whitespace-only changes make suggestions noisy and hard to apply.
+
 ### Line numbers
 The "line" field must be a line number that exists in the NEW version of the file (the right side of the diff). Use the line numbers shown in the diff hunks after the "+" marker.
 
@@ -69,21 +71,18 @@ The "line" field must be a line number that exists in the NEW version of the fil
 - Suggestions to introduce new patterns or abstractions not in the codebase
 
 ### Summary field
-Write a structured summary with exactly these parts separated by `\n\n`:
+Write a brief summary with exactly two parts separated by `\n\n`:
 
-1. **One-sentence verdict** — what is your overall assessment? Start with one of:
+1. **One-sentence verdict** — your overall assessment. Start with one of:
    - "🔴 Changes requested —" (when high-severity findings exist)
    - "⚠️ Review recommended —" (when medium findings exist)
    - "✅ Looks good —" (when only low or no findings)
 
 2. **What changed** — 1-2 sentences describing what the PR does, referencing key files or methods in backticks.
 
-3. **Key concerns** (omit if no findings) — bullet list of the top issues, one per line prefixed with `-`, using the severity emoji at the start:
-   - `🔴` for high, `🟡` for medium, `🔵` for low
-
 Example:
 ```
-"⚠️ Review recommended — The PR has medium issues that should be addressed before merge.\n\nThe PR refactors `changeIncomingPackageLocation` to use `_selectedLocationId` for state tracking and migrates `LocationFormSheet` from V1 `QBottomSheet` to V2 `DSBottomSheet`.\n\n- 🟡 `addPostFrameCallback` in `build()` fires on every rebuild\n- 🟡 Missing `saveAndValidateForm` call before reading `locationSelectableFieldValue`"
+"⚠️ Review recommended — The PR has medium issues that should be addressed before merge.\n\nThe PR refactors `changeIncomingPackageLocation` to use `_selectedLocationId` for state tracking and migrates `LocationFormSheet` from V1 `QBottomSheet` to V2 `DSBottomSheet`."
 ```
 
-Keep the summary under 150 words total. No wall of text.
+Keep the summary under 100 words total. No wall of text.

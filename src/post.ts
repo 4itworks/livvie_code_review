@@ -18,7 +18,7 @@ export async function postReview(
   maxComments: number
 ): Promise<void> {
   const { comments, postedFindings } = buildComments(review, files, maxComments);
-  const body = buildReviewBody(review, postedFindings, files);
+  const body = buildReviewBody(review, postedFindings);
 
   const hasHigh = review.findings.some((f) => f.severity === "high");
   const event = hasHigh && requestChangesOnHigh ? "REQUEST_CHANGES" : "COMMENT";
@@ -44,7 +44,7 @@ export async function postReview(
         owner,
         repo,
         pull_number: pullNumber,
-        body: buildReviewBody(review, new Set(), files),
+        body: buildReviewBody(review, new Set()),
         event,
       });
       reviewId = response.data.id;
@@ -100,8 +100,8 @@ function formatCommentBody(finding: ReviewFinding): string {
   const confidenceIcon = confidenceIconMap[finding.confidence];
 
   const parts: string[] = [];
-  parts.push(`${severityBadge} **${REVIEW_SIGNATURE}** — **${finding.severity.toUpperCase()}**`);
-  parts.push(`Confidence: ${confidenceIcon} **${finding.confidence}**`);
+  parts.push(`${severityBadge} **Severity: ${finding.severity.toUpperCase()}**`);
+  parts.push(`${confidenceIcon} **Confidence: ${finding.confidence}**`);
   parts.push("");
   parts.push(finding.description);
 
@@ -127,7 +127,7 @@ const confidenceIconMap: Record<string, string> = {
   low: "❓",
 };
 
-function buildReviewBody(review: StructuredReview, postedFindings: Set<ReviewFinding>, files: DiffFile[]): string {
+function buildReviewBody(review: StructuredReview, postedFindings: Set<ReviewFinding>): string {
   const parts: string[] = [];
 
   parts.push(`## ${REVIEW_SIGNATURE}`);
@@ -144,9 +144,6 @@ function buildReviewBody(review: StructuredReview, postedFindings: Set<ReviewFin
   if (counts.low > 0) stats.push(`🔵 **${counts.low} Low**`);
   if (stats.length === 0) stats.push("✅ **No issues found**");
   parts.push(stats.join(" · "));
-  parts.push("");
-
-  parts.push(`📁 **Files reviewed:** ${files.map((f) => `\`${f.filename}\``).join(" · ")}`);
   parts.push("");
 
   if (review.summary) {
