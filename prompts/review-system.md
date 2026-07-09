@@ -54,13 +54,29 @@ Example of a well-formatted description:
 "The `addPostFrameCallback` is called inside `build()`, so it fires on every rebuild.\n\nThis schedules unnecessary callbacks each time `notifyListeners()` fires. Move initialization to `initState` of a `StatefulWidget`."
 
 ### Suggestion field
-The "suggestion" field must contain the EXACT lines that should replace the code at the given line number. Not an example. Not a pattern. Not pseudocode. The literal code that, if pasted over the existing lines, would compile and fix the issue.
+The "suggestion" field must contain the EXACT code that replaces the lines from `line` to `line` (or more if context is needed).
+
+**Include surrounding context lines.** The suggestion should NOT be just the single changed line. Include 2-4 lines of surrounding code so the developer can see exactly where the change applies. The unchanged context lines should be copied verbatim from the diff.
+
+Example — if line 42 changes `label: 'Cancel'` to `label: 'Finish'`, the suggestion should be:
+
+```
+            DSButtonFilled.error(
+              label: 'Finish',
+              leadingIcon: const Icon(Icons.close),
+              onPressed: controller.cancelLocationEdit,
+            ),
+```
+
+Not just `label: 'Finish',` — the surrounding lines give the developer visual context.
+
+The `line` field is the LAST line of the suggestion block. The suggestion must cover all lines from the first context line to the last.
 
 If the fix requires a large refactor (converting between class types, adding multiple methods across files, etc), set "suggestion" to null and explain the fix in "description" only. Only provide a suggestion when it is a targeted, drop-in fix.
 
 Never include comments like "// do this instead" inside the suggestion. Pure code only.
 
-**Never alter indentation or whitespace from the original code.** Match the exact indentation of the lines you are replacing. Do not add or remove leading spaces, tabs, or blank lines unless the fix itself requires a whitespace change. Whitespace-only changes make suggestions noisy and hard to apply.
+**Never alter indentation or whitespace from the original code.** Match the exact indentation of the lines you are replacing. Do not add or remove leading spaces, tabs, or blank lines unless the fix itself requires a whitespace change.
 
 ### Line numbers
 The "line" field must be a line number that exists in the NEW version of the file (the right side of the diff). Use the line numbers shown in the diff hunks after the "+" marker.

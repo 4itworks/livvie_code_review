@@ -83,16 +83,34 @@ function buildComments(
       continue;
     }
 
-    comments.push({
+    const comment: ReviewComment = {
       path: finding.file,
       line: finding.line,
       side: "RIGHT",
       body: formatCommentBody(finding),
-    });
+    };
+
+    if (finding.suggestion) {
+      const startLine = calculateStartLine(finding);
+      if (startLine && startLine < finding.line && isLineInDiff(diffFile.patch, startLine)) {
+        comment.start_line = startLine;
+        comment.start_side = "RIGHT";
+      }
+    }
+
+    comments.push(comment);
     postedFindings.add(finding);
   }
 
   return { comments, postedFindings };
+}
+
+function calculateStartLine(finding: ReviewFinding): number | undefined {
+  if (!finding.suggestion) return undefined;
+  const lineCount = finding.suggestion.split("\n").length;
+  if (lineCount <= 1) return undefined;
+  const startLine = finding.line - lineCount + 1;
+  return startLine > 0 ? startLine : 1;
 }
 
 function formatCommentBody(finding: ReviewFinding): string {

@@ -22,6 +22,8 @@ export interface DiffFile {
 export interface ReviewComment {
   path: string;
   line: number;
+  start_line?: number;
   side: "RIGHT";
+  start_side?: "RIGHT";
   body: string;
 }
