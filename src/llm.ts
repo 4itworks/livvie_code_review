@@ -41,7 +41,7 @@ export async function reviewWithLLM(
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${apiKey}`,
-          "HTTP-Referer": "https://github.com/4itworks/livvie-code-review",
+          "HTTP-Referer": "https://github.com/4itworks/livvie_code_review",
           "X-Title": "livvie-code-review",
         },
         body,

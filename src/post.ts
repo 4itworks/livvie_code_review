@@ -192,7 +192,7 @@ function buildReviewBody(review: StructuredReview, postedFindings: Set<ReviewFin
   }
 
   parts.push("---");
-  parts.push("*[Livvie Code Review](https://github.com/4itworks/livvie-code-review)*");
+  parts.push("*[Livvie Code Review](https://github.com/4itworks/livvie_code_review)*");
 
   return parts.join("\n");
 }
