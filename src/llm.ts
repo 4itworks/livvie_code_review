@@ -20,41 +20,71 @@ export async function reviewWithLLM(
   core.info(`Sending review request to ${model}...`);
   core.info(`Diff size: ${diffText.length} chars`);
 
-  const response = await fetch(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-      "HTTP-Referer": "https://github.com/4itworks/livvie-code-review",
-      "X-Title": "livvie-code-review",
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userContent },
-      ],
-      temperature: 0.1,
-      max_tokens: maxOutputTokens,
-      response_format: { type: "json_object" },
-    }),
+  const body = JSON.stringify({
+    model,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userContent },
+    ],
+    temperature: 0.1,
+    max_tokens: maxOutputTokens,
+    response_format: { type: "json_object" },
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`LLM API error ${response.status}: ${errorText}`);
+  const maxRetries = 3;
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+          "HTTP-Referer": "https://github.com/4itworks/livvie-code-review",
+          "X-Title": "livvie-code-review",
+        },
+        body,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`LLM API error ${response.status}: ${errorText}`);
+      }
+
+      const responseText = await response.text();
+
+      let data: any;
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        throw new Error(
+          `LLM returned truncated or invalid JSON response (${responseText.length} chars). ` +
+          `Preview: ${responseText.slice(0, 200)}...`
+        );
+      }
+
+      const content = data.choices?.[0]?.message?.content;
+
+      if (!content) {
+        throw new Error("LLM returned empty response");
+      }
+
+      core.info("Received LLM response, parsing...");
+
+      return parseReview(content);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      if (attempt < maxRetries) {
+        const delay = attempt * 5;
+        core.warning(`LLM request failed (attempt ${attempt}/${maxRetries}): ${lastError.message}. Retrying in ${delay}s...`);
+        await new Promise((r) => setTimeout(r, delay * 1000));
+      }
+    }
   }
 
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content;
-
-  if (!content) {
-    throw new Error("LLM returned empty response");
-  }
-
-  core.info("Received LLM response, parsing...");
-
-  return parseReview(content);
+  throw lastError ?? new Error("LLM request failed after retries");
 }
 
 function buildUserMessage(diffText: string, reviewInstructions: string): string {
