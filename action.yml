@@ -11,14 +11,14 @@ inputs:
     required: true
     default: "${{ github.token }}"
   llm-api-key:
-    description: "API key for your LLM provider."
+    description: "API key for your LLM provider. This is the only sensitive input — store it as a GitHub Secret."
     required: true
   llm-base-url:
-    description: "Base URL for OpenAI-compatible API."
-    required: true
+    description: "Base URL for OpenAI-compatible API. Not sensitive — set as a plain string."
+    required: false
     default: "https://openrouter.ai/api/v1"
   model:
-    description: "Model name (e.g. z-ai/glm-5.2, anthropic/claude-sonnet-4)."
+    description: "Model name (e.g. z-ai/glm-5.2, anthropic/claude-sonnet-4). Not sensitive — set as a plain string."
     required: true
   review-instructions-file:
     description: "Repository file with extra review instructions."

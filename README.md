@@ -17,13 +17,13 @@ Most AI code review tools post code fixes as generic code blocks. Livvie Code Re
 
 ## Setup
 
-### 1. Add secrets
+### 1. Add secret
+
+Only the API key needs to be a secret:
 
 | Secret | Value |
 |--------|-------|
 | `LLM_API_KEY` | Your LLM API key |
-| `LLM_BASE_URL` | `https://openrouter.ai/api/v1` (or your provider) |
-| `LLM_MODEL` | e.g. `z-ai/glm-5.2` |
 
 ### 2. Add workflow
 
@@ -49,12 +49,12 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - uses: 4itworks/livvie-code-review@main
+      - uses: 4itworks/livvie_code_review@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           llm-api-key: ${{ secrets.LLM_API_KEY }}
-          llm-base-url: ${{ secrets.LLM_BASE_URL }}
-          model: ${{ secrets.LLM_MODEL }}
+          llm-base-url: "https://openrouter.ai/api/v1"
+          model: "z-ai/glm-5.2"
           review-instructions-file: ".github/code-reviewer.md"
 ```
 
@@ -76,14 +76,16 @@ Create `.github/code-reviewer.md` in your repo with project-specific review rule
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `github-token` | yes | `${{ github.token }}` | GitHub token |
-| `llm-api-key` | yes | — | LLM API key |
-| `llm-base-url` | yes | `https://openrouter.ai/api/v1` | OpenAI-compatible base URL |
-| `model` | yes | — | Model name |
+| `llm-api-key` | yes | — | LLM API key (secret) |
+| `llm-base-url` | no | `https://openrouter.ai/api/v1` | OpenAI-compatible base URL (plain string) |
+| `model` | no | — | Model name (plain string, e.g. `z-ai/glm-5.2`) |
 | `review-instructions-file` | no | `.github/code-reviewer.md` | Extra review instructions |
 | `max-diff-size` | no | `50000` | Max diff chars sent to model |
 | `max-output-tokens` | no | `16000` | Max response tokens |
 | `request-changes-on-high` | no | `true` | Block PR on high-severity |
 | `max-comments` | no | `25` | Max inline comments |
+
+Only `llm-api-key` needs to be a GitHub Secret. The `model` and `llm-base-url` are plain strings — they are not sensitive values and can be set directly in the workflow.
 
 ## License
 
