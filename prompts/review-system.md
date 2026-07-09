@@ -10,6 +10,7 @@ Return ONLY a JSON object with this exact shape:
   "findings": [
     {
       "severity": "high",
+      "confidence": "high",
       "file": "path/to/file.dart",
       "line": 42,
       "description": "What is wrong and why it matters",
@@ -25,6 +26,12 @@ Return ONLY a JSON object with this exact shape:
 - "high": silent runtime bugs, wrong variable references, security issues, missing error handling
 - "medium": logic inconsistencies, dead code, missing dispose, type mismatches
 - "low": style issues, minor improvements (only if genuinely confusing)
+
+### Confidence
+Your confidence that the finding is a real issue, not a false positive:
+- "high": you are certain this is a bug or real problem. The code path is clear.
+- "medium": likely a problem but some context or runtime conditions might make it acceptable.
+- "low": you suspect an issue but lack enough context to be sure.
 
 ### Description field
 Write the description in well-structured Markdown with proper punctuation and paragraph breaks. Follow these rules:

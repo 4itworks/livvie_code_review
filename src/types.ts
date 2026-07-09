@@ -1,5 +1,6 @@
 export interface ReviewFinding {
   severity: "high" | "medium" | "low";
+  confidence: "high" | "medium" | "low";
   file: string;
   line: number;
   description: string;

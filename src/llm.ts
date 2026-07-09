@@ -140,6 +140,9 @@ function normalizeFinding(raw: any): ReviewFinding {
     severity: raw.severity === "high" || raw.severity === "medium" || raw.severity === "low"
       ? raw.severity
       : "low",
+    confidence: raw.confidence === "high" || raw.confidence === "medium" || raw.confidence === "low"
+      ? raw.confidence
+      : "medium",
     file: String(raw.file || "").trim(),
     line: Number(raw.line) || 0,
     description: String(raw.description || "").trim(),
