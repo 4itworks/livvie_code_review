@@ -97,11 +97,11 @@ function buildComments(
 
 function formatCommentBody(finding: ReviewFinding): string {
   const severityBadge = severityBadgeMap[finding.severity];
-  const confidenceLabel = confidenceLabelMap[finding.confidence];
+  const confidenceIcon = confidenceIconMap[finding.confidence];
 
   const parts: string[] = [];
   parts.push(`${severityBadge} **${REVIEW_SIGNATURE}** — **${finding.severity.toUpperCase()}**`);
-  parts.push(`🎯 Confidence: **${confidenceLabel}**`);
+  parts.push(`Confidence: ${confidenceIcon} **${finding.confidence}**`);
   parts.push("");
   parts.push(finding.description);
 
@@ -121,10 +121,10 @@ const severityBadgeMap: Record<string, string> = {
   low: "🔵",
 };
 
-const confidenceLabelMap: Record<string, string> = {
-  high: "🟢 High",
-  medium: "🟡 Medium",
-  low: "🔴 Low",
+const confidenceIconMap: Record<string, string> = {
+  high: "✅",
+  medium: "⚠️",
+  low: "❓",
 };
 
 function buildReviewBody(review: StructuredReview, postedFindings: Set<ReviewFinding>): string {
@@ -160,8 +160,8 @@ function buildReviewBody(review: StructuredReview, postedFindings: Set<ReviewFin
     for (let i = 0; i < unposted.length; i++) {
       const f = unposted[i];
       const sevBadge = severityBadgeMap[f.severity];
-      const confLabel = confidenceLabelMap[f.confidence];
-      parts.push(`${sevBadge} **${i + 1}** — \`${f.file}:${f.line}\` · 🎯 ${confLabel}`);
+      const confIcon = confidenceIconMap[f.confidence];
+      parts.push(`${sevBadge} **${i + 1}** — \`${f.file}:${f.line}\` · Confidence: ${confIcon} **${f.confidence}**`);
       parts.push("");
       parts.push(f.description);
       if (f.suggestion) {
