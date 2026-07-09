@@ -18,7 +18,7 @@ export async function postReview(
   maxComments: number
 ): Promise<void> {
   const { comments, postedFindings } = buildComments(review, files, maxComments);
-  const body = buildReviewBody(review, postedFindings);
+  const body = buildReviewBody(review, postedFindings, files);
 
   const hasHigh = review.findings.some((f) => f.severity === "high");
   const event = hasHigh && requestChangesOnHigh ? "REQUEST_CHANGES" : "COMMENT";
@@ -44,7 +44,7 @@ export async function postReview(
         owner,
         repo,
         pull_number: pullNumber,
-        body: buildReviewBody(review, new Set()),
+        body: buildReviewBody(review, new Set(), files),
         event,
       });
       reviewId = response.data.id;
@@ -127,7 +127,7 @@ const confidenceIconMap: Record<string, string> = {
   low: "❓",
 };
 
-function buildReviewBody(review: StructuredReview, postedFindings: Set<ReviewFinding>): string {
+function buildReviewBody(review: StructuredReview, postedFindings: Set<ReviewFinding>, files: DiffFile[]): string {
   const parts: string[] = [];
 
   parts.push(`## ${REVIEW_SIGNATURE}`);
@@ -143,12 +143,29 @@ function buildReviewBody(review: StructuredReview, postedFindings: Set<ReviewFin
   if (counts.medium > 0) stats.push(`🟡 **${counts.medium} Medium**`);
   if (counts.low > 0) stats.push(`🔵 **${counts.low} Low**`);
   if (stats.length === 0) stats.push("✅ **No issues found**");
-  parts.push(stats.join(" | "));
+  parts.push(stats.join(" · "));
+  parts.push("");
+
+  parts.push(`📁 **Files reviewed:** ${files.map((f) => `\`${f.filename}\``).join(" · ")}`);
   parts.push("");
 
   if (review.summary) {
-    parts.push("### Summary");
     parts.push(review.summary);
+    parts.push("");
+  }
+
+  const posted = review.findings.filter((f) => postedFindings.has(f));
+  if (posted.length > 0) {
+    parts.push("### 📋 Posted findings");
+    parts.push("");
+    parts.push("| | Severity | Confidence | File | Line |");
+    parts.push("|---|---|---|---|---|");
+    for (const f of posted) {
+      const sevBadge = severityBadgeMap[f.severity];
+      const confIcon = confidenceIconMap[f.confidence];
+      const shortFile = f.file.split("/").pop() ?? f.file;
+      parts.push(`| **${posted.indexOf(f) + 1}** | ${sevBadge} ${f.severity} | ${confIcon} ${f.confidence} | \`${shortFile}\` | ${f.line} |`);
+    }
     parts.push("");
   }
 
