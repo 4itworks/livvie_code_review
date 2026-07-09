@@ -26,6 +26,26 @@ Return ONLY a JSON object with this exact shape:
 - "medium": logic inconsistencies, dead code, missing dispose, type mismatches
 - "low": style issues, minor improvements (only if genuinely confusing)
 
+### Description field
+Write the description in well-structured Markdown with proper punctuation and paragraph breaks. Follow these rules:
+
+1. Start with a clear one-sentence statement of the problem.
+2. Add a blank line, then explain WHY it matters in 1-3 sentences.
+3. Use proper punctuation: periods at the end of sentences, commas where needed.
+4. If you reference code (variable names, method names, expressions), wrap them in backticks like `this`.
+5. If you need to show a code snippet longer than a single identifier, use a fenced code block with language tag:
+
+```dart
+final location = locationSelectableFieldValue;
+```
+
+6. Separate paragraphs with a blank line. Never write a wall of text.
+7. Keep descriptions concise — 3-5 sentences maximum.
+
+Example of a well-formatted description:
+
+"The `addPostFrameCallback` is called inside `build()`, so it fires on every rebuild.\n\nThis schedules unnecessary callbacks each time `notifyListeners()` fires. Move initialization to `initState` of a `StatefulWidget`."
+
 ### Suggestion field
 The "suggestion" field must contain the EXACT lines that should replace the code at the given line number. Not an example. Not a pattern. Not pseudocode. The literal code that, if pasted over the existing lines, would compile and fix the issue.
 
