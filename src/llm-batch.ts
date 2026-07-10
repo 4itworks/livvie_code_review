@@ -226,11 +226,15 @@ export async function callLLMWithRetry(
       const reasoningContent = data.choices?.[0]?.message?.reasoning_content;
       const finishReason = data.choices?.[0]?.finish_reason;
 
-      if (!content) {
+      if (!content || content.length < 20) {
         const detail = finishReason === "length"
           ? `Model hit token limit (finish_reason: length). Reasoning consumed all ${maxOutputTokens} tokens with none left for output. Increase max-output-tokens or reduce reasoning-effort.`
-          : `content was null/empty (finish_reason: ${finishReason || "unknown"})`;
-        throw new Error(`LLM returned empty response: ${detail}`);
+          : `content too short (${content?.length || 0} chars, finish_reason: ${finishReason || "unknown"})`;
+        throw new Error(`LLM returned empty/short response: ${detail}`);
+      }
+
+      if (content.length < 100) {
+        core.warning(`LLM response is suspiciously short (${content.length} chars): "${content}"`);
       }
 
       if (reasoningContent) {
