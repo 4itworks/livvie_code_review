@@ -110,7 +110,8 @@ function calculateStartLine(finding: ReviewFinding): number | undefined {
   const lineCount = finding.suggestion.split("\n").length;
   if (lineCount <= 1) return undefined;
   const startLine = finding.line - lineCount + 1;
-  return startLine > 0 ? startLine : 1;
+  if (startLine < 1 || startLine >= finding.line) return undefined;
+  return startLine;
 }
 
 function formatCommentBody(finding: ReviewFinding): string {

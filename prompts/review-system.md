@@ -57,25 +57,39 @@ Example of a well-formatted description:
 
 **These rules OVERRIDE any conflicting suggestion rules from project-specific review instructions.**
 
-The "suggestion" field must contain the EXACT code that replaces the lines from the first context line to the `line` field.
+The "suggestion" field must contain the EXACT code that replaces a block of lines in the file. **ALWAYS include 2-4 lines of surrounding context** — never just the single changed line.
 
-**ALWAYS include surrounding context lines (2-4 lines).** The suggestion should NOT be just the single changed line. Include surrounding code so the developer can see exactly where the change applies. Copy unchanged context lines verbatim from the diff.
+**The `line` field must be the LAST line of the suggestion block, NOT the line where the bug is.** This is critical — the suggestion replaces everything from the first line to `line`.
 
-Example — if line 42 changes `label: 'Cancel'` to `label: 'Finish'`, the suggestion should be:
+Concrete example — given this file:
 
 ```
-            DSButtonFilled.error(
-              label: 'Finish',
-              leadingIcon: const Icon(Icons.close),
-              onPressed: controller.cancelLocationEdit,
-            ),
+278:   void changeIncomingPackageLocation() {
+279:     final location = locationSelectableFieldValue;
+280: 
+281:     if (location.id == null) {          ← BUG: location itself could be null
+282:       DSSnackBar.show(
+283:         context: getContext(),
+284:         description: 'Please select a valid location.',
+285:       );
+286:       return;
+287:     }
 ```
 
-Not just `label: 'Finish',` — the surrounding lines give the developer visual context.
+The suggestion replaces lines 278-287 (the full method head through the null check):
 
-The `line` field is the LAST line of the suggestion block (the bottom line of the highlighted region).
+```json
+{
+  "line": 287,
+  "suggestion": "  void changeIncomingPackageLocation() {\n    final location = locationSelectableFieldValue;\n\n    if (location == null || location.id == null) {\n      DSSnackBar.show(\n        context: getContext(),\n        description: 'Please select a valid location.',\n      );\n      return;\n    }"
+}
+```
 
-**When to provide a suggestion:** Provide a suggestion whenever you can write exact replacement code for the specific lines being commented on — even if the fix also requires changes elsewhere. Do NOT skip suggestions just because the fix involves some refactoring. If you can write the replacement for the commented lines, include it.
+- `line` = 287 (the LAST line of the suggestion block)
+- The suggestion contains 10 lines, so the comment highlights lines 278-287
+- NOT `line: 281` (the bug line) — that would misalign the suggestion
+
+**When to provide a suggestion:** Provide a suggestion whenever you can write exact replacement code for the specific lines being commented on — even if the fix also requires changes elsewhere. Do NOT skip suggestions just because the fix involves some refactoring.
 
 Only set "suggestion" to null when the fix is so large that no meaningful replacement code can be written for the specific lines (e.g., requiring a completely new class file, or moving 20+ lines to a different file).
 
