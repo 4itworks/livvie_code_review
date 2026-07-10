@@ -1,29 +1,19 @@
 import * as core from "@actions/core";
 import * as fs from "fs";
-import * as path from "path";
 import { Octokit } from "@octokit/rest";
-import { fetchDiff, fetchFileContents, formatDiffForPrompt } from "./diff.js";
-import { reviewWithLLM } from "./llm.js";
-import { postReview } from "./post.js";
-import type { StructuredReview } from "./types.js";
+import { runPipeline } from "./pipeline.js";
+import type { PipelineConfig } from "./types.js";
+import { parseIgnorePatterns } from "./ignore-patterns.js";
+import { parsePerspectivesInput } from "./perspectives.js";
 
 async function run(): Promise<void> {
   try {
-    const githubToken = core.getInput("github-token", { required: true });
-    const llmApiKey = core.getInput("llm-api-key", { required: true });
-    const llmBaseUrl = core.getInput("llm-base-url", { required: true });
-    const model = core.getInput("model", { required: true });
-    const reviewInstructionsFile = core.getInput("review-instructions-file");
-    const maxDiffSize = parseInt(core.getInput("max-diff-size") || "50000", 10);
-    const maxOutputTokens = parseInt(core.getInput("max-output-tokens") || "16000", 10);
-    const reasoningEffort = core.getInput("reasoning-effort") || "none";
-    const fallbackModel = core.getInput("fallback-model") || "";
-    const requestChangesOnHigh = core.getInput("request-changes-on-high") !== "false";
-    const maxComments = parseInt(core.getInput("max-comments") || "25", 10);
-
-    const context = JSON.parse(process.env.GITHUB_EVENT_PATH ? fs.readFileSync(process.env.GITHUB_EVENT_PATH, "utf8") : "{}");
+    const context = JSON.parse(
+      process.env.GITHUB_EVENT_PATH
+        ? fs.readFileSync(process.env.GITHUB_EVENT_PATH, "utf8")
+        : "{}"
+    );
     const pullNumber = context.pull_request?.number;
-
     if (!pullNumber) {
       core.info("No pull request in event, skipping");
       return;
@@ -31,65 +21,59 @@ async function run(): Promise<void> {
 
     const owner = context.repository?.owner?.login;
     const repo = context.repository?.name;
-
     if (!owner || !repo) {
       throw new Error("Could not determine repository owner/name");
     }
 
-    core.info(`Reviewing PR #${pullNumber} in ${owner}/${repo}`);
+    const githubToken = core.getInput("github-token", { required: true });
+    const reviewInstructionsFile = core.getInput("review-instructions-file") || ".github/code-reviewer.md";
+    const prBaseRef = context.pull_request?.base?.ref ?? "main";
 
     const octokit = new Octokit({ auth: githubToken });
+    const reviewInstructions = await loadReviewInstructions(
+      octokit,
+      owner,
+      repo,
+      prBaseRef,
+      reviewInstructionsFile
+    );
 
-    const files = await fetchDiff(octokit, owner, repo, pullNumber, maxDiffSize);
+    const config: PipelineConfig = {
+      githubToken,
+      owner,
+      repo,
+      pullNumber,
+      prHeadRef: context.pull_request?.head?.ref ?? "",
+      prBaseRef,
+      llmApiKey: core.getInput("llm-api-key", { required: true }),
+      llmBaseUrl: core.getInput("llm-base-url", { required: true }),
+      model: core.getInput("model", { required: true }),
+      fallbackModel: core.getInput("fallback-model") || "",
+      maxOutputTokens: parseInt(core.getInput("max-output-tokens") || "16000", 10),
+      reasoningEffort: core.getInput("reasoning-effort") || "none",
+      maxDiffSize: parseInt(core.getInput("max-diff-size") || "50000", 10),
+      maxBatches: parseInt(core.getInput("max-batches") || "0", 10),
+      contextWindow: parseInt(core.getInput("context-window") || "128000", 10),
+      ignorePatterns: parseIgnorePatterns(
+        core.getInput("ignore-patterns") ||
+          "*.g.dart,*.freezed.dart,*.mocks.dart,*.gen.dart,build/**,dist/**"
+      ),
+      perspectives: parsePerspectivesInput(core.getInput("perspectives") || "generalist"),
+      reviewInstructions,
+      requestChangesOnHigh: core.getInput("request-changes-on-high") !== "false",
+      maxComments: parseInt(core.getInput("max-comments") || "25", 10),
+      fetchConcurrency: 5,
+      llmConcurrency: 3,
+    };
 
-    if (files.length === 0) {
-      core.info("No files with diffs found, skipping");
-      return;
+    core.info(`Reviewing PR #${pullNumber} in ${owner}/${repo}`);
+    core.info(`Perspectives: ${config.perspectives.join(", ")}`);
+    core.info(`Max batches: ${config.maxBatches || "unlimited"}`);
+
+    const reviewId = await runPipeline(config);
+    if (reviewId > 0) {
+      core.info(`Posted review #${reviewId}`);
     }
-
-    core.info(`Found ${files.length} files with diffs`);
-
-    const prHeadRef = context.pull_request?.head?.ref;
-    const fileContents = await fetchFileContents(octokit, owner, repo, prHeadRef, files);
-
-    const diffText = formatDiffForPrompt(files, fileContents);
-    const systemPrompt = loadSystemPrompt();
-    const reviewInstructions = await loadReviewInstructions(octokit, owner, repo, context.pull_request.base.ref, reviewInstructionsFile);
-
-    let review: StructuredReview;
-    try {
-      review = await reviewWithLLM(
-        llmApiKey,
-        llmBaseUrl,
-        model,
-        systemPrompt,
-        diffText,
-        reviewInstructions,
-        maxOutputTokens,
-        reasoningEffort
-      );
-    } catch (primaryError) {
-      if (!fallbackModel) throw primaryError;
-
-      core.warning(`Primary model ${model} failed: ${primaryError instanceof Error ? primaryError.message : String(primaryError)}`);
-      core.info(`Falling back to ${fallbackModel}...`);
-
-      review = await reviewWithLLM(
-        llmApiKey,
-        llmBaseUrl,
-        fallbackModel,
-        systemPrompt,
-        diffText,
-        reviewInstructions,
-        maxOutputTokens,
-        "none"
-      );
-    }
-
-    core.info(`Review complete: ${review.findings.length} findings`);
-
-    await postReview(octokit, owner, repo, pullNumber, review, files, requestChangesOnHigh, maxComments);
-
     core.info("Done");
   } catch (error) {
     if (error instanceof Error) {
@@ -98,11 +82,6 @@ async function run(): Promise<void> {
       core.setFailed(String(error));
     }
   }
-}
-
-function loadSystemPrompt(): string {
-  const promptPath = path.join(path.dirname(new URL(import.meta.url).pathname), "..", "prompts", "review-system.md");
-  return fs.readFileSync(promptPath, "utf8");
 }
 
 async function loadReviewInstructions(

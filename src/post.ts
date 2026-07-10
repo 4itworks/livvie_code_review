@@ -1,8 +1,7 @@
-import * as fs from "fs";
-import * as path from "path";
 import { Octokit } from "@octokit/rest";
 import * as core from "@actions/core";
-import type { StructuredReview, ReviewFinding, ReviewComment, DiffFile } from "./types.js";
+import type { ConsolidatedReview, ReviewFinding, ReviewComment, DiffFile } from "./types.js";
+import { PERSPECTIVE_REGISTRY } from "./perspectives.js";
 import { isLineInDiff } from "./diff.js";
 
 const REVIEW_SIGNATURE = "Livvie Code Review";
@@ -12,15 +11,15 @@ export async function postReview(
   owner: string,
   repo: string,
   pullNumber: number,
-  review: StructuredReview,
+  consolidated: ConsolidatedReview,
   files: DiffFile[],
   requestChangesOnHigh: boolean,
   maxComments: number
-): Promise<void> {
-  const { comments, postedFindings } = buildComments(review, files, maxComments);
-  const body = buildReviewBody(review, postedFindings);
+): Promise<number> {
+  const { comments, postedFindings } = buildComments(consolidated, files, maxComments);
+  const body = buildReviewBody(consolidated, postedFindings);
 
-  const hasHigh = review.findings.some((f) => f.severity === "high");
+  const hasHigh = consolidated.findings.some((f) => f.severity === "high");
   const event = hasHigh && requestChangesOnHigh ? "REQUEST_CHANGES" : "COMMENT";
 
   core.info(`Posting ${event} review with ${comments.length} inline comments...`);
@@ -64,7 +63,7 @@ export async function postReview(
           owner,
           repo,
           pull_number: pullNumber,
-          body: buildReviewBody(review, new Set()),
+          body: buildReviewBody(consolidated, new Set()),
           event,
         });
         reviewId = response.data.id;
@@ -77,17 +76,19 @@ export async function postReview(
   core.info(`Posted review #${reviewId}`);
 
   await dismissStaleReviews(octokit, owner, repo, pullNumber, reviewId);
+
+  return reviewId;
 }
 
 function buildComments(
-  review: StructuredReview,
+  consolidated: ConsolidatedReview,
   files: DiffFile[],
   maxComments: number
 ): { comments: ReviewComment[]; postedFindings: Set<ReviewFinding> } {
   const comments: ReviewComment[] = [];
   const postedFindings = new Set<ReviewFinding>();
 
-  for (const finding of review.findings) {
+  for (const finding of consolidated.findings) {
     if (comments.length >= maxComments) {
       core.info(`Reached max-comments limit (${maxComments})`);
       break;
@@ -138,6 +139,7 @@ function calculateStartLine(finding: ReviewFinding): number | undefined {
 function formatCommentBody(finding: ReviewFinding): string {
   const severityBadge = severityBadgeMap[finding.severity];
   const confidenceIcon = confidenceIconMap[finding.confidence];
+  const perspectiveName = PERSPECTIVE_REGISTRY[finding.perspective]?.name ?? finding.perspective;
 
   const parts: string[] = [];
   parts.push(`${severityBadge} **Severity: ${finding.severity.toUpperCase()}**`);
@@ -151,6 +153,9 @@ function formatCommentBody(finding: ReviewFinding): string {
     parts.push(finding.suggestion);
     parts.push("```");
   }
+
+  parts.push("");
+  parts.push(`— Found by: **${perspectiveName}**`);
 
   return parts.join("\n");
 }
@@ -167,46 +172,58 @@ const confidenceIconMap: Record<string, string> = {
   low: "❓",
 };
 
-function buildReviewBody(review: StructuredReview, postedFindings: Set<ReviewFinding>): string {
+function buildReviewBody(
+  consolidated: ConsolidatedReview,
+  postedFindings: Set<ReviewFinding>
+): string {
   const parts: string[] = [];
 
   parts.push(`## ${REVIEW_SIGNATURE}`);
   parts.push("");
 
-  const counts = { high: 0, medium: 0, low: 0 };
-  for (const f of review.findings) {
-    counts[f.severity]++;
-  }
-
-  const stats: string[] = [];
-  if (counts.high > 0) stats.push(`🔴 **${counts.high} High**`);
-  if (counts.medium > 0) stats.push(`🟡 **${counts.medium} Medium**`);
-  if (counts.low > 0) stats.push(`🔵 **${counts.low} Low**`);
-  if (stats.length === 0) stats.push("✅ **No issues found**");
-  parts.push(stats.join(" · "));
+  const { stats } = consolidated;
+  const statParts: string[] = [];
+  if (stats.high > 0) statParts.push(`🔴 **${stats.high} High**`);
+  if (stats.medium > 0) statParts.push(`🟡 **${stats.medium} Medium**`);
+  if (stats.low > 0) statParts.push(`🔵 **${stats.low} Low**`);
+  if (statParts.length === 0) statParts.push("✅ **No issues found**");
+  parts.push(statParts.join(" · "));
   parts.push("");
 
-  if (review.summary) {
-    parts.push(review.summary);
+  if (consolidated.summary) {
+    parts.push(consolidated.summary);
     parts.push("");
   }
 
-  const posted = review.findings.filter((f) => postedFindings.has(f));
-  if (posted.length > 0) {
-    parts.push("### 📋 Posted findings");
+  if (consolidated.perspectiveSummaries.length > 0) {
+    parts.push("### 🏷️ Perspective Breakdown");
     parts.push("");
-    parts.push("| | Severity | Confidence | File | Line |");
+    parts.push("| Perspective | High | Medium | Low | Total |");
     parts.push("|---|---|---|---|---|");
-    for (const f of posted) {
-      const sevBadge = severityBadgeMap[f.severity];
-      const confIcon = confidenceIconMap[f.confidence];
-      const shortFile = f.file.split("/").pop() ?? f.file;
-      parts.push(`| **${posted.indexOf(f) + 1}** | ${sevBadge} ${f.severity} | ${confIcon} ${f.confidence} | \`${shortFile}\` | ${f.line} |`);
+    for (const ps of consolidated.perspectiveSummaries) {
+      parts.push(`| ${ps.perspectiveName} | ${ps.highCount} | ${ps.mediumCount} | ${ps.lowCount} | ${ps.findingCount} |`);
     }
     parts.push("");
   }
 
-  const unposted = review.findings.filter((f) => !postedFindings.has(f));
+  const posted = consolidated.findings.filter((f) => postedFindings.has(f));
+  if (posted.length > 0) {
+    parts.push("### 📋 Posted findings");
+    parts.push("");
+    parts.push("| # | Severity | Confidence | File | Line | Perspective |");
+    parts.push("|---|---|---|---|---|---|");
+    for (let i = 0; i < posted.length; i++) {
+      const f = posted[i];
+      const sevBadge = severityBadgeMap[f.severity];
+      const confIcon = confidenceIconMap[f.confidence];
+      const shortFile = f.file.split("/").pop() ?? f.file;
+      const perspName = PERSPECTIVE_REGISTRY[f.perspective]?.name ?? f.perspective;
+      parts.push(`| **${i + 1}** | ${sevBadge} ${f.severity} | ${confIcon} ${f.confidence} | \`${shortFile}\` | ${f.line} | ${perspName} |`);
+    }
+    parts.push("");
+  }
+
+  const unposted = consolidated.findings.filter((f) => !postedFindings.has(f));
   if (unposted.length > 0) {
     parts.push("---");
     parts.push("### Findings not posted inline");
@@ -215,7 +232,8 @@ function buildReviewBody(review: StructuredReview, postedFindings: Set<ReviewFin
       const f = unposted[i];
       const sevBadge = severityBadgeMap[f.severity];
       const confIcon = confidenceIconMap[f.confidence];
-      parts.push(`${sevBadge} **${i + 1}** — \`${f.file}:${f.line}\` · Confidence: ${confIcon} **${f.confidence}**`);
+      const perspName = PERSPECTIVE_REGISTRY[f.perspective]?.name ?? f.perspective;
+      parts.push(`${sevBadge} **${i + 1}** — \`${f.file}:${f.line}\` · ${confIcon} ${f.confidence} · Found by: ${perspName}`);
       parts.push("");
       parts.push(f.description);
       if (f.suggestion) {
@@ -228,7 +246,21 @@ function buildReviewBody(review: StructuredReview, postedFindings: Set<ReviewFin
     }
   }
 
+  if (consolidated.unreviewedFiles.length > 0) {
+    parts.push("---");
+    parts.push("### ⚠️ Unreviewed files");
+    parts.push("");
+    parts.push("The following files could not be reviewed (LLM calls failed):");
+    parts.push("");
+    for (const f of consolidated.unreviewedFiles) {
+      parts.push(`- \`${f}\``);
+    }
+    parts.push("");
+  }
+
   parts.push("---");
+  parts.push(`*Batches: ${stats.totalBatches} · Perspectives: ${stats.totalPerspectives} · LLM calls: ${stats.successfulLLMCalls}/${stats.totalLLMCalls}*`);
+  parts.push("");
   parts.push("*[Livvie Code Review](https://github.com/4itworks/livvie_code_review)*");
 
   return parts.join("\n");

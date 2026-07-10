@@ -1,5 +1,5 @@
 name: "Livvie Code Review"
-description: "AI code review with native GitHub suggestion blocks and REQUEST_CHANGES support. Bring your own LLM key."
+description: "AI code review with multi-perspective specialist reviewers, native GitHub suggestion blocks, and REQUEST_CHANGES support. Bring your own LLM key."
 author: "4itworks"
 branding:
   icon: "eye"
@@ -25,7 +25,7 @@ inputs:
     required: false
     default: ".github/code-reviewer.md"
   max-diff-size:
-    description: "Maximum diff size in characters sent to the model."
+    description: "Maximum diff size in characters per file."
     required: false
     default: "50000"
   max-output-tokens:
@@ -33,7 +33,7 @@ inputs:
     required: false
     default: "16000"
   reasoning-effort:
-    description: "Reasoning effort level for models that support it (e.g. kimi-k2, deepseek-r1, glm-4.5). Options: none, low, medium, high, max. 'max' uses the maximum reasoning the model offers. Ignored by models that don't support reasoning."
+    description: "Reasoning effort level for models that support it. Options: none, low, medium, high, max. Ignored by models that don't support reasoning."
     required: false
     default: "none"
   fallback-model:
@@ -48,6 +48,22 @@ inputs:
     description: "Maximum inline comments to post."
     required: false
     default: "25"
+  ignore-patterns:
+    description: "Comma-separated glob patterns for files to skip (e.g. *.g.dart,build/). Defaults to generated file patterns."
+    required: false
+    default: "*.g.dart,*.freezed.dart,*.mocks.dart,*.gen.dart,build/**,dist/**"
+  max-batches:
+    description: "Maximum number of file batches. Each batch is reviewed by every perspective, so total LLM calls = batches × perspectives. 0 = no limit."
+    required: false
+    default: "0"
+  context-window:
+    description: "Context window size in tokens for the model. Used for token budget calculation. Override if your model has a different context window."
+    required: false
+    default: "128000"
+  perspectives:
+    description: "Comma-separated review perspectives to run. Options: code-quality, security, performance, architecture, generalist. Default runs generalist only."
+    required: false
+    default: "generalist"
 
 runs:
   using: "node24"

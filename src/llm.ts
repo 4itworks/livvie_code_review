@@ -103,7 +103,7 @@ export async function reviewWithLLM(
 
       core.info("Received LLM response, parsing...");
 
-      return parseReview(content);
+      return parseReview(content, "generalist");
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
 
@@ -135,7 +135,7 @@ function buildUserMessage(diffText: string, reviewInstructions: string): string 
   return parts.join("\n");
 }
 
-function parseReview(content: string): StructuredReview {
+export function parseReview(content: string, perspectiveId: string): StructuredReview {
   const jsonText = extractJson(content);
 
   if (!jsonText) {
@@ -147,7 +147,7 @@ function parseReview(content: string): StructuredReview {
     const parsed = JSON.parse(jsonText) as LLMResponse;
     return {
       summary: parsed.summary || "",
-      findings: (parsed.findings || []).map(normalizeFinding).filter(isValidFinding),
+      findings: (parsed.findings || []).map((f: any) => normalizeFinding(f, perspectiveId)).filter(isValidFinding),
     };
   } catch (error) {
     core.warning(`Failed to parse JSON review: ${error}`);
@@ -155,7 +155,7 @@ function parseReview(content: string): StructuredReview {
   }
 }
 
-function extractJson(content: string): string | null {
+export function extractJson(content: string): string | null {
   const fenced = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
   if (fenced) return fenced[1].trim();
 
@@ -166,7 +166,7 @@ function extractJson(content: string): string | null {
   return content.slice(start, end + 1).trim();
 }
 
-function normalizeFinding(raw: any): ReviewFinding {
+export function normalizeFinding(raw: any, perspectiveId: string): ReviewFinding {
   return {
     severity: raw.severity === "high" || raw.severity === "medium" || raw.severity === "low"
       ? raw.severity
@@ -178,9 +178,10 @@ function normalizeFinding(raw: any): ReviewFinding {
     line: Number(raw.line) || 0,
     description: String(raw.description || "").trim(),
     suggestion: raw.suggestion ? String(raw.suggestion).trim() : null,
+    perspective: perspectiveId,
   };
 }
 
-function isValidFinding(f: ReviewFinding): boolean {
+export function isValidFinding(f: ReviewFinding): boolean {
   return f.file.length > 0 && f.line > 0 && f.description.length > 0;
 }
