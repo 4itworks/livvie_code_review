@@ -296,25 +296,78 @@ async function dismissStaleReviews(
     for (const review of reviews) {
       if (
         review.id !== currentReviewId &&
-        (review.state === "CHANGES_REQUESTED" || review.state === "COMMENTED") &&
         review.user?.type === "Bot" &&
         (review.body || "").includes(REVIEW_SIGNATURE)
       ) {
         try {
-          await octokit.rest.pulls.dismissReview({
-            owner,
-            repo,
-            pull_number: pullNumber,
-            review_id: review.id,
-            message: "Superseded by a newer review.",
-          });
-          core.info(`Dismissed stale review #${review.id} (${review.state})`);
+          if (review.state === "CHANGES_REQUESTED") {
+            await octokit.rest.pulls.dismissReview({
+              owner,
+              repo,
+              pull_number: pullNumber,
+              review_id: review.id,
+              message: "Superseded by a newer review.",
+            });
+            core.info(`Dismissed stale review #${review.id} (CHANGES_REQUESTED)`);
+          } else if (review.state === "COMMENTED") {
+            await deleteReviewComments(octokit, owner, repo, pullNumber, review.id);
+            await updateReviewBody(octokit, owner, repo, pullNumber, review.id);
+            core.info(`Cleaned up stale review #${review.id} (COMMENTED)`);
+          }
         } catch (error) {
-          core.warning(`Could not dismiss stale review #${review.id}: ${error}`);
+          core.warning(`Could not clean up stale review #${review.id}: ${error}`);
         }
       }
     }
   } catch (error) {
     core.warning(`Could not check for stale reviews: ${error}`);
+  }
+}
+
+async function deleteReviewComments(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  reviewId: number
+): Promise<void> {
+  const comments = await octokit.paginate(octokit.rest.pulls.listCommentsForReview, {
+    owner,
+    repo,
+    pull_number: pullNumber,
+    review_id: reviewId,
+    per_page: 100,
+  });
+
+  for (const comment of comments) {
+    try {
+      await octokit.rest.pulls.deleteReviewComment({
+        owner,
+        repo,
+        comment_id: comment.id,
+      });
+    } catch (error) {
+      core.warning(`Could not delete comment ${comment.id}: ${error}`);
+    }
+  }
+}
+
+async function updateReviewBody(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  reviewId: number
+): Promise<void> {
+  try {
+    await octokit.rest.pulls.updateReview({
+      owner,
+      repo,
+      pull_number: pullNumber,
+      review_id: reviewId,
+      body: `*Superseded by a newer review. Inline comments have been removed.*`,
+    });
+  } catch (error) {
+    core.warning(`Could not update review body #${reviewId}: ${error}`);
   }
 }
