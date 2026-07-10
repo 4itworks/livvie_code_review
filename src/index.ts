@@ -15,6 +15,7 @@ async function run(): Promise<void> {
     const reviewInstructionsFile = core.getInput("review-instructions-file");
     const maxDiffSize = parseInt(core.getInput("max-diff-size") || "50000", 10);
     const maxOutputTokens = parseInt(core.getInput("max-output-tokens") || "16000", 10);
+    const reasoningEffort = core.getInput("reasoning-effort") || "none";
     const requestChangesOnHigh = core.getInput("request-changes-on-high") !== "false";
     const maxComments = parseInt(core.getInput("max-comments") || "25", 10);
 
@@ -57,7 +58,8 @@ async function run(): Promise<void> {
       systemPrompt,
       diffText,
       reviewInstructions,
-      maxOutputTokens
+      maxOutputTokens,
+      reasoningEffort
     );
 
     core.info(`Review complete: ${review.findings.length} findings`);

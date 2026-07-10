@@ -13,14 +13,18 @@ export async function reviewWithLLM(
   systemPrompt: string,
   diffText: string,
   reviewInstructions: string,
-  maxOutputTokens: number
+  maxOutputTokens: number,
+  reasoningEffort: string
 ): Promise<StructuredReview> {
   const userContent = buildUserMessage(diffText, reviewInstructions);
 
   core.info(`Sending review request to ${model}...`);
   core.info(`Diff size: ${diffText.length} chars`);
+  if (reasoningEffort !== "none") {
+    core.info(`Reasoning effort: ${reasoningEffort}`);
+  }
 
-  const body = JSON.stringify({
+  const requestBody: Record<string, unknown> = {
     model,
     messages: [
       { role: "system", content: systemPrompt },
@@ -29,7 +33,13 @@ export async function reviewWithLLM(
     temperature: 0.1,
     max_tokens: maxOutputTokens,
     response_format: { type: "json_object" },
-  });
+  };
+
+  if (reasoningEffort !== "none") {
+    requestBody.reasoning = { effort: reasoningEffort };
+  }
+
+  const body = JSON.stringify(requestBody);
 
   const maxRetries = 3;
   let lastError: Error | null = null;
@@ -65,9 +75,19 @@ export async function reviewWithLLM(
       }
 
       const content = data.choices?.[0]?.message?.content;
+      const reasoningContent = data.choices?.[0]?.message?.reasoning_content;
 
       if (!content) {
         throw new Error("LLM returned empty response");
+      }
+
+      if (reasoningContent) {
+        core.info("=== Reasoning trace ===");
+        const trace = reasoningContent.length > 2000
+          ? reasoningContent.slice(0, 2000) + "...(truncated)"
+          : reasoningContent;
+        core.info(trace);
+        core.info("=== End reasoning trace ===");
       }
 
       core.info("Received LLM response, parsing...");

@@ -29,9 +29,13 @@ inputs:
     required: false
     default: "50000"
   max-output-tokens:
-    description: "Maximum tokens for the LLM response."
+    description: "Maximum tokens for the LLM response (includes reasoning tokens if reasoning is enabled)."
     required: false
     default: "16000"
+  reasoning-effort:
+    description: "Reasoning effort level for models that support it (e.g. kimi-k2, deepseek-r1, glm-4.5). Set to 'none' to disable. Ignored by models that don't support reasoning."
+    required: false
+    default: "none"
   request-changes-on-high:
     description: "Post REQUEST_CHANGES when high-severity findings exist."
     required: false
