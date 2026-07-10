@@ -39,15 +39,36 @@ export async function postReview(
     reviewId = response.data.id;
   } catch (error: any) {
     if (comments.length > 0 && shouldRetryWithoutInline(error)) {
-      core.warning("GitHub rejected inline comments, posting summary only...");
-      const response = await octokit.rest.pulls.createReview({
-        owner,
-        repo,
-        pull_number: pullNumber,
-        body: buildReviewBody(review, new Set()),
-        event,
-      });
-      reviewId = response.data.id;
+      core.warning("GitHub rejected inline comments, retrying as single-line...");
+
+      const singleLineComments = comments.map((c) => ({
+        path: c.path,
+        line: c.line,
+        side: c.side as "RIGHT",
+        body: c.body,
+      }));
+
+      try {
+        const response = await octokit.rest.pulls.createReview({
+          owner,
+          repo,
+          pull_number: pullNumber,
+          body,
+          event,
+          comments: singleLineComments,
+        });
+        reviewId = response.data.id;
+      } catch {
+        core.warning("Single-line comments also rejected, posting summary only...");
+        const response = await octokit.rest.pulls.createReview({
+          owner,
+          repo,
+          pull_number: pullNumber,
+          body: buildReviewBody(review, new Set()),
+          event,
+        });
+        reviewId = response.data.id;
+      }
     } else {
       throw error;
     }
