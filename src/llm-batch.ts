@@ -225,21 +225,6 @@ export async function callLLMWithRetry(
       const content = data.choices?.[0]?.message?.content;
       const reasoningContent = data.choices?.[0]?.message?.reasoning_content;
       const finishReason = data.choices?.[0]?.finish_reason;
-      const usage = data.usage;
-
-      core.info(`=== LLM Response Debug ===`);
-      core.info(`Model: ${model}`);
-      core.info(`Finish reason: ${finishReason || 'null'}`);
-      core.info(`Content length: ${content?.length || 0} chars`);
-      core.info(`Content preview: "${(content || '').slice(0, 100)}"`);
-      core.info(`Reasoning content exists: ${!!reasoningContent}`);
-      core.info(`Reasoning content length: ${reasoningContent?.length || 0} chars`);
-      if (usage) {
-        core.info(`Usage - prompt_tokens: ${usage.prompt_tokens}`);
-        core.info(`Usage - completion_tokens: ${usage.completion_tokens}`);
-        core.info(`Usage - total_tokens: ${usage.total_tokens}`);
-      }
-      core.info(`=== End LLM Response Debug ===`);
 
       if (!content || content.length < 20) {
         const detail = finishReason === "length"
