@@ -62,6 +62,7 @@ export async function reviewWithLLM(
           "X-Title": "livvie-code-review",
         },
         body,
+        signal: AbortSignal.timeout(300000),
       });
 
       if (!response.ok) {
@@ -83,9 +84,13 @@ export async function reviewWithLLM(
 
       const content = data.choices?.[0]?.message?.content;
       const reasoningContent = data.choices?.[0]?.message?.reasoning_content;
+      const finishReason = data.choices?.[0]?.finish_reason;
 
       if (!content) {
-        throw new Error("LLM returned empty response");
+        const detail = finishReason === "length"
+          ? `Model hit token limit (finish_reason: length). Reasoning consumed all ${maxOutputTokens} tokens with none left for output. Increase max-output-tokens or reduce reasoning-effort.`
+          : `content was null/empty (finish_reason: ${finishReason || "unknown"})`;
+        throw new Error(`LLM returned empty response: ${detail}`);
       }
 
       if (reasoningContent) {
