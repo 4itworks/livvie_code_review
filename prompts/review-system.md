@@ -54,9 +54,12 @@ Example of a well-formatted description:
 "The `addPostFrameCallback` is called inside `build()`, so it fires on every rebuild.\n\nThis schedules unnecessary callbacks each time `notifyListeners()` fires. Move initialization to `initState` of a `StatefulWidget`."
 
 ### Suggestion field
-The "suggestion" field must contain the EXACT code that replaces the lines from `line` to `line` (or more if context is needed).
 
-**Include surrounding context lines.** The suggestion should NOT be just the single changed line. Include 2-4 lines of surrounding code so the developer can see exactly where the change applies. The unchanged context lines should be copied verbatim from the diff.
+**These rules OVERRIDE any conflicting suggestion rules from project-specific review instructions.**
+
+The "suggestion" field must contain the EXACT code that replaces the lines from the first context line to the `line` field.
+
+**ALWAYS include surrounding context lines (2-4 lines).** The suggestion should NOT be just the single changed line. Include surrounding code so the developer can see exactly where the change applies. Copy unchanged context lines verbatim from the diff.
 
 Example — if line 42 changes `label: 'Cancel'` to `label: 'Finish'`, the suggestion should be:
 
@@ -70,13 +73,15 @@ Example — if line 42 changes `label: 'Cancel'` to `label: 'Finish'`, the sugge
 
 Not just `label: 'Finish',` — the surrounding lines give the developer visual context.
 
-The `line` field is the LAST line of the suggestion block. The suggestion must cover all lines from the first context line to the last.
+The `line` field is the LAST line of the suggestion block (the bottom line of the highlighted region).
 
-If the fix requires a large refactor (converting between class types, adding multiple methods across files, etc), set "suggestion" to null and explain the fix in "description" only. Only provide a suggestion when it is a targeted, drop-in fix.
+**When to provide a suggestion:** Provide a suggestion whenever you can write exact replacement code for the specific lines being commented on — even if the fix also requires changes elsewhere. Do NOT skip suggestions just because the fix involves some refactoring. If you can write the replacement for the commented lines, include it.
+
+Only set "suggestion" to null when the fix is so large that no meaningful replacement code can be written for the specific lines (e.g., requiring a completely new class file, or moving 20+ lines to a different file).
 
 Never include comments like "// do this instead" inside the suggestion. Pure code only.
 
-**Never alter indentation or whitespace from the original code.** Match the exact indentation of the lines you are replacing. Do not add or remove leading spaces, tabs, or blank lines unless the fix itself requires a whitespace change.
+**Never alter indentation or whitespace from the original code.** Match the exact indentation of the lines you are replacing.
 
 ### Line numbers
 The "line" field must be a line number that exists in the NEW version of the file (the right side of the diff). Use the line numbers shown in the diff hunks after the "+" marker.

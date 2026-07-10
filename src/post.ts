@@ -92,7 +92,7 @@ function buildComments(
 
     if (finding.suggestion) {
       const startLine = calculateStartLine(finding);
-      if (startLine && startLine < finding.line && isLineInDiff(diffFile.patch, startLine)) {
+      if (startLine && startLine < finding.line) {
         comment.start_line = startLine;
         comment.start_side = "RIGHT";
       }
