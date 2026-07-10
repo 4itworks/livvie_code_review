@@ -17,7 +17,7 @@ import { reviewBatchFromPerspective, type LLMCallConfig } from "./llm-batch.js";
 import { consolidateReviews } from "./consolidation.js";
 import { postReview } from "./post.js";
 
-export async function runPipeline(config: PipelineConfig): Promise<number> {
+export async function runPipeline(config: PipelineConfig): Promise<{ reviewId: number; findingCount: number }> {
   const octokit = new Octokit({ auth: config.githubToken });
 
   core.startGroup("Stage 1: Fetch");
@@ -31,7 +31,7 @@ export async function runPipeline(config: PipelineConfig): Promise<number> {
   if (allFiles.length === 0) {
     core.info("No files with diffs");
     core.endGroup();
-    return 0;
+    return { reviewId: 0, findingCount: 0 };
   }
 
   const { kept: files, ignored } = filterIgnoredFiles(allFiles, config.ignorePatterns);
@@ -41,7 +41,7 @@ export async function runPipeline(config: PipelineConfig): Promise<number> {
   if (files.length === 0) {
     core.info("All files ignored");
     core.endGroup();
-    return 0;
+    return { reviewId: 0, findingCount: 0 };
   }
 
   core.info(`Fetching contents for ${files.length} files (concurrency ${config.fetchConcurrency})...`);
@@ -155,5 +155,5 @@ export async function runPipeline(config: PipelineConfig): Promise<number> {
   );
   core.endGroup();
 
-  return reviewId;
+  return { reviewId, findingCount: consolidated.findings.length };
 }

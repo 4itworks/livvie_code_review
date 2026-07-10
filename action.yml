@@ -51,7 +51,7 @@ inputs:
   ignore-patterns:
     description: "Comma-separated glob patterns for files to skip (e.g. *.g.dart,build/). Defaults to generated file patterns."
     required: false
-    default: "*.g.dart,*.freezed.dart,*.mocks.dart,*.gen.dart,build/**,dist/**"
+    default: "build/**,dist/**,node_modules/**"
   max-batches:
     description: "Maximum number of file batches. Each batch is reviewed by every perspective, so total LLM calls = batches × perspectives. 0 = no limit."
     required: false
@@ -64,7 +64,17 @@ inputs:
     description: "Comma-separated review perspectives to run. Options: code-quality, security, performance, architecture, generalist. Default runs generalist only."
     required: false
     default: "generalist"
+  verbose:
+    description: "Log LLM reasoning traces and detailed debug info to the Actions log."
+    required: false
+    default: "false"
+
+outputs:
+  review-id:
+    description: "The ID of the posted GitHub review."
+  finding-count:
+    description: "Total number of findings in the review."
 
 runs:
-  using: "node24"
+  using: "node20"
   main: "dist/index.js"

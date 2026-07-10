@@ -7,6 +7,7 @@ export function createCircuitBreaker(threshold?: number): {
   getStatus(): CircuitBreakerStatus;
 } {
   const failureThreshold = threshold ?? 3;
+  const COOLDOWN_MS = 30_000;
   const status: CircuitBreakerStatus = {
     state: "closed",
     consecutiveFailures: 0,
@@ -16,7 +17,14 @@ export function createCircuitBreaker(threshold?: number): {
 
   return {
     check(): boolean {
-      return status.state === "open";
+      if (status.state === "open") {
+        if (status.openedAt && Date.now() - status.openedAt >= COOLDOWN_MS) {
+          status.state = "half-open";
+          return false;
+        }
+        return true;
+      }
+      return false;
     },
     recordSuccess(): void {
       status.consecutiveFailures = 0;
@@ -25,7 +33,7 @@ export function createCircuitBreaker(threshold?: number): {
     },
     recordFailure(): void {
       status.consecutiveFailures += 1;
-      if (status.consecutiveFailures >= status.threshold) {
+      if (status.state === "half-open" || status.consecutiveFailures >= status.threshold) {
         status.state = "open";
         status.openedAt = Date.now();
       }

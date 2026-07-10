@@ -97,7 +97,18 @@ function compareFindings(a: ReviewFinding, b: ReviewFinding): number {
 }
 
 export function areFindingsDuplicate(a: ReviewFinding, b: ReviewFinding): boolean {
-  return a.file === b.file && Math.abs(a.line - b.line) <= 3;
+  if (a.file !== b.file || Math.abs(a.line - b.line) > 3) return false;
+  if (a.perspective === b.perspective) return true;
+  const descA = a.description.toLowerCase();
+  const descB = b.description.toLowerCase();
+  const wordsA = new Set(descA.split(/\s+/).filter((w) => w.length > 3));
+  const wordsB = new Set(descB.split(/\s+/).filter((w) => w.length > 3));
+  let overlap = 0;
+  for (const word of Array.from(wordsA)) {
+    if (wordsB.has(word)) overlap++;
+  }
+  const minSize = Math.min(wordsA.size, wordsB.size);
+  return minSize > 0 && overlap / minSize >= 0.5;
 }
 
 export function sortFindings(findings: ReviewFinding[]): ReviewFinding[] {

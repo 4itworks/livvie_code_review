@@ -1,6 +1,8 @@
 import { encode } from "gpt-tokenizer";
 import type { TokenBudget } from "./types.js";
 
+export const PER_FILE_OVERHEAD_TOKENS = 100;
+
 export function countTokens(text: string): number {
   if (!text) return 0;
   try {
@@ -8,10 +10,6 @@ export function countTokens(text: string): number {
   } catch {
     return Math.ceil(text.length / 4);
   }
-}
-
-export function countPromptTokens(systemPrompt: string, userContent: string): number {
-  return countTokens(systemPrompt) + countTokens(userContent) + 8;
 }
 
 export function calculateTokenBudget(

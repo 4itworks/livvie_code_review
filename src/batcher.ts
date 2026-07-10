@@ -1,4 +1,5 @@
 import type { DiffFile, PreparedFile, Batch, TokenBudget } from "./types.js";
+import * as core from "@actions/core";
 import { countTokens } from "./tokenizer.js";
 import { progressiveTruncate } from "./truncation.js";
 import { buildCrossFileContext } from "./cross-file.js";
@@ -98,6 +99,12 @@ export function binPackFiles(
 
     if (maxBatches > 0 && batches.length >= maxBatches) {
       const lastBatch = batches[batches.length - 1];
+      if (lastBatch.tokenCount + file.tokenCount > tokenBudget.fileBudget * 2) {
+        core.warning(
+          `Batch ${lastBatch.index} overflow: ${lastBatch.tokenCount} + ${file.tokenCount} tokens exceeds 2x budget (${tokenBudget.fileBudget}). ` +
+          `File ${file.filename} may cause LLM truncation. Consider increasing max-batches.`
+        );
+      }
       lastBatch.files.push(file);
       lastBatch.tokenCount += file.tokenCount;
       continue;

@@ -1,7 +1,7 @@
 import type { Batch } from "./types.js";
 import { countTokens } from "./tokenizer.js";
 
-export function compactHunkSummary(patch: string): string {
+function compactHunkSummary(patch: string): string {
   if (!patch) return "";
   const lines: string[] = [];
   for (const line of patch.split("\n")) {

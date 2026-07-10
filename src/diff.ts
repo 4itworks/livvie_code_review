@@ -1,4 +1,5 @@
 import { Octokit } from "@octokit/rest";
+import * as core from "@actions/core";
 import type { DiffFile } from "./types.js";
 import { mapWithConcurrency } from "./concurrency.js";
 import { extractChangedLines } from "./truncation.js";
@@ -77,8 +78,9 @@ export async function fetchFileContentsParallel(
             .join("\n");
           return { filename: file.filename, content: numbered };
         }
-      } catch {
-        // File might be deleted or binary — skip
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        core.warning(`Could not fetch content for ${file.filename}: ${msg}`);
       }
       return { filename: file.filename, content: "" };
     },
@@ -92,57 +94,6 @@ export async function fetchFileContentsParallel(
   }
 
   return contents;
-}
-
-export function extractDiffHunks(patch: string): Array<{
-  oldStart: number;
-  newStart: number;
-  oldLines: number;
-  newLines: number;
-  content: string;
-}> {
-  const hunks: Array<{
-    oldStart: number;
-    newStart: number;
-    oldLines: number;
-    newLines: number;
-    content: string;
-  }> = [];
-
-  const lines = patch.split("\n");
-  let i = 0;
-
-  while (i < lines.length) {
-    const line = lines[i];
-    const match = line.match(/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/);
-
-    if (match) {
-      const oldStart = parseInt(match[1], 10);
-      const oldLines = match[2] ? parseInt(match[2], 10) : 1;
-      const newStart = parseInt(match[3], 10);
-      const newLines = match[4] ? parseInt(match[4], 10) : 1;
-
-      const contentLines: string[] = [line];
-      i++;
-
-      while (i < lines.length && !lines[i].startsWith("@@")) {
-        contentLines.push(lines[i]);
-        i++;
-      }
-
-      hunks.push({
-        oldStart,
-        newStart,
-        oldLines,
-        newLines,
-        content: contentLines.join("\n"),
-      });
-    } else {
-      i++;
-    }
-  }
-
-  return hunks;
 }
 
 export function isLineInDiff(patch: string, targetLine: number): boolean {

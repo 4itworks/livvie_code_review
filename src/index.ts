@@ -38,6 +38,14 @@ async function run(): Promise<void> {
       reviewInstructionsFile
     );
 
+    function parsePositiveInt(value: string, name: string, defaultValue: number): number {
+      const parsed = parseInt(value || String(defaultValue), 10);
+      if (isNaN(parsed) || parsed < 0) {
+        throw new Error(`Invalid value for ${name}: "${value}". Must be a non-negative integer.`);
+      }
+      return parsed;
+    }
+
     const config: PipelineConfig = {
       githubToken,
       owner,
@@ -49,29 +57,36 @@ async function run(): Promise<void> {
       llmBaseUrl: core.getInput("llm-base-url", { required: true }),
       model: core.getInput("model", { required: true }),
       fallbackModel: core.getInput("fallback-model") || "",
-      maxOutputTokens: parseInt(core.getInput("max-output-tokens") || "16000", 10),
+      maxOutputTokens: parsePositiveInt(core.getInput("max-output-tokens"), "max-output-tokens", 16000),
       reasoningEffort: core.getInput("reasoning-effort") || "none",
-      maxDiffSize: parseInt(core.getInput("max-diff-size") || "50000", 10),
-      maxBatches: parseInt(core.getInput("max-batches") || "0", 10),
-      contextWindow: parseInt(core.getInput("context-window") || "128000", 10),
+      maxDiffSize: parsePositiveInt(core.getInput("max-diff-size"), "max-diff-size", 50000),
+      maxBatches: parsePositiveInt(core.getInput("max-batches"), "max-batches", 0),
+      contextWindow: parsePositiveInt(core.getInput("context-window"), "context-window", 128000),
       ignorePatterns: parseIgnorePatterns(
         core.getInput("ignore-patterns") ||
-          "*.g.dart,*.freezed.dart,*.mocks.dart,*.gen.dart,build/**,dist/**"
+          "build/**,dist/**,node_modules/**"
       ),
       perspectives: parsePerspectivesInput(core.getInput("perspectives") || "generalist"),
       reviewInstructions,
       requestChangesOnHigh: core.getInput("request-changes-on-high") !== "false",
-      maxComments: parseInt(core.getInput("max-comments") || "25", 10),
+      maxComments: parsePositiveInt(core.getInput("max-comments"), "max-comments", 25),
       fetchConcurrency: 5,
       llmConcurrency: 3,
     };
+
+    core.setSecret(config.githubToken);
+    core.setSecret(config.llmApiKey);
+    const verbose = core.getInput("verbose") === "true";
+    process.env.LIVVIE_VERBOSE = verbose ? "1" : "";
 
     core.info(`Reviewing PR #${pullNumber} in ${owner}/${repo}`);
     core.info(`Perspectives: ${config.perspectives.join(", ")}`);
     core.info(`Max batches: ${config.maxBatches || "unlimited"}`);
 
-    const reviewId = await runPipeline(config);
+    const { reviewId, findingCount } = await runPipeline(config);
     if (reviewId > 0) {
+      core.setOutput("review-id", String(reviewId));
+      core.setOutput("finding-count", String(findingCount));
       core.info(`Posted review #${reviewId}`);
     }
     core.info("Done");

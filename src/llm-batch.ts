@@ -188,16 +188,24 @@ export async function callLLMWithRetry(
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      const response = await fetch(`${baseUrl}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-          "HTTP-Referer": "https://github.com/4itworks/livvie_code_review",
-          "X-Title": "livvie-code-review",
-        },
-        body,
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120_000);
+      let response: Response;
+      try {
+        response = await fetch(`${baseUrl}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+            "HTTP-Referer": "https://github.com/4itworks/livvie_code_review",
+            "X-Title": "livvie-code-review",
+          },
+          body,
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -207,7 +215,8 @@ export async function callLLMWithRetry(
           await sleep(retryAfter);
           continue;
         }
-        throw new Error(`LLM API error ${response.status}: ${errorText}`);
+        const sanitizedError = errorText.replace(/Bearer\s+[\w-]+/gi, "Bearer [REDACTED]").slice(0, 500);
+        throw new Error(`LLM API error ${response.status}: ${sanitizedError}`);
       }
 
       const responseText = await response.text();
@@ -237,7 +246,7 @@ export async function callLLMWithRetry(
         core.warning(`LLM response is suspiciously short (${content.length} chars): "${content}"`);
       }
 
-      if (reasoningContent) {
+      if (reasoningContent && process.env.LIVVIE_VERBOSE === "1") {
         core.info("=== Reasoning trace ===");
         const trace = reasoningContent.length > 2000
           ? reasoningContent.slice(0, 2000) + "...(truncated)"

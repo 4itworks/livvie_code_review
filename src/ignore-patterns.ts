@@ -1,20 +1,5 @@
 import type { DiffFile } from "./types.js";
 
-export const DEFAULT_IGNORE_PATTERNS: string[] = [
-  "*.g.dart",
-  "*.freezed.dart",
-  "*.mocks.dart",
-  "*.gen.dart",
-  "build/**",
-  "dist/**",
-  "node_modules/**",
-  "*.min.js",
-  "*.min.css",
-  "package-lock.json",
-  "yarn.lock",
-  "pnpm-lock.yaml",
-];
-
 export function parseIgnorePatterns(input: string): string[] {
   if (!input || !input.trim()) return [];
   return input
@@ -53,7 +38,7 @@ function globToRegex(pattern: string): RegExp {
       i++;
     }
   }
-  return new RegExp(regex);
+  return new RegExp("^" + regex + "$");
 }
 
 export function shouldIgnoreFile(filename: string, patterns: string[]): boolean {

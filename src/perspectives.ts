@@ -271,7 +271,7 @@ export const PERSPECTIVE_REGISTRY: Record<string, Perspective> = {
   },
 };
 
-export const DEFAULT_PERSPECTIVES: string[] = ["generalist"];
+const DEFAULT_PERSPECTIVES: string[] = ["generalist"];
 
 export function getPerspectives(ids: string[]): Perspective[] {
   const result: Perspective[] = [];

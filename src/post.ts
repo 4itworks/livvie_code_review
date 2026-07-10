@@ -168,7 +168,7 @@ function formatCommentBody(finding: ReviewFinding): string {
       parts.push("```suggestion");
     } else {
       core.warning(`Posting unbalanced suggestion as plain code block: ${finding.file}:${finding.line}`);
-      parts.push("```dart");
+      parts.push("```");
     }
     parts.push(finding.suggestion);
     parts.push("```");

@@ -12,6 +12,12 @@
   <a href="https://livvie.io/">livvie.io</a> · <a href="#license">MIT</a> · <a href="#setup">Quick Start</a>
 </p>
 
+<p align="center">
+  <a href="https://github.com/4itworks/livvie_code_review/actions/workflows/self-test.yml"><img src="https://github.com/4itworks/livvie_code_review/actions/workflows/self-test.yml/badge.svg" alt="Self Test"></a>
+  <a href="https://github.com/marketplace/actions/livvie-code-review"><img src="https://img.shields.io/badge/GitHub-Marketplace-blue" alt="GitHub Marketplace"></a>
+  <img src="https://img.shields.io/badge/version-1.0.0-green" alt="Version">
+</p>
+
 ---
 
 ## Table of Contents
@@ -148,13 +154,10 @@ on:
     types: [opened, ready_for_review]
     paths:
       - "**.dart"
-  workflow_dispatch:
 
 permissions:
   contents: read
   pull-requests: write
-  issues: write
-
 jobs:
   review:
     runs-on: ubuntu-latest
@@ -162,7 +165,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - uses: 4itworks/livvie_code_review@main
+      - uses: 4itworks/livvie_code_review@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           llm-api-key: ${{ secrets.LLM_API_KEY }}
@@ -172,7 +175,7 @@ jobs:
           perspectives: "generalist"
           max-batches: "0"
           context-window: "128000"
-          ignore-patterns: "*.g.dart,*.freezed.dart,*.mocks.dart,*.gen.dart,build/**,dist/**"
+          ignore-patterns: "build/**,dist/**,node_modules/**"
 ```
 
 ### 3. Add review instructions (optional)
@@ -194,12 +197,20 @@ Create `.github/code-reviewer.md` in your repo with project-specific review rule
 | `fallback-model` | no | `""` | Fallback model if primary fails |
 | `request-changes-on-high` | no | `true` | Block PR on high-severity |
 | `max-comments` | no | `25` | Max inline comments |
-| `ignore-patterns` | no | `*.g.dart,*.freezed.dart,*.mocks.dart,*.gen.dart,build/**,dist/**` | Glob patterns for files to skip |
+| `ignore-patterns` | no | `build/**,dist/**,node_modules/**` | Glob patterns for files to skip |
 | `max-batches` | no | `0` | Max batches (caps LLM calls = batches × perspectives). 0 = unlimited |
 | `context-window` | no | `128000` | Model context window in tokens (for budget calculation) |
 | `perspectives` | no | `generalist` | Comma-separated review perspectives to run |
+| `verbose` | no | `false` | Log LLM reasoning traces and debug info to the Actions log |
 
 Only `llm-api-key` needs to be a GitHub Secret. The `model` and `llm-base-url` are plain strings — they are not sensitive values and can be set directly in the workflow.
+
+## Outputs
+
+| Output | Description |
+|--------|-------------|
+| `review-id` | The ID of the posted GitHub review |
+| `finding-count` | Total number of findings in the review |
 
 ## Cost Control
 
