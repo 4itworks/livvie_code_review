@@ -107,6 +107,10 @@ Never include comments of any kind inside the suggestion — no \`//\` comments,
 
 **Never alter indentation or whitespace from the original code.** Match the exact indentation of the lines you are replacing.
 
+**CRITICAL — Syntactic completeness:** The suggestion MUST be syntactically complete and self-contained. Every opening brace \`{\`, bracket \`[\`, and parenthesis \`(\` MUST have a matching closing \`}\`, \`]\`, \`) WITHIN the suggestion. If you open a block (method, class, if-statement, callback), you MUST close it within the suggestion. A suggestion like \`if (condition) {\` without its closing \`}\` will be REJECTED and stripped. When in doubt, include more lines to ensure all blocks are closed.
+
+**CRITICAL — Complete method bodies:** If your suggestion starts with a method signature (e.g., \`void foo() {\`), it MUST include the COMPLETE method body and the closing \`}\`. Never post a partial method — either suggest the entire method or just the specific lines that need changing (with surrounding context).
+
 ### Line numbers
 The "line" field must be a line number that exists in the NEW version of the file (the right side of the diff). You are given the full file content with line numbers prefixed (e.g. \`281:     if (location.id == null) {\`). Use those line numbers to determine the exact \`line\` value.
 

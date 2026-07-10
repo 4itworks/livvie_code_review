@@ -1,5 +1,6 @@
 import * as core from "@actions/core";
 import type { StructuredReview, ReviewFinding } from "./types.js";
+import { validateSuggestion } from "./suggestion.js";
 
 interface LLMResponse {
   summary: string;
@@ -240,7 +241,7 @@ export function normalizeFinding(raw: any, perspectiveId: string): ReviewFinding
   const line = Number(raw.line) || 0;
   const suggestionStartLine = Number(raw.suggestion_start_line) || null;
 
-  return {
+  const normalized: ReviewFinding = {
     severity: raw.severity === "high" || raw.severity === "medium" || raw.severity === "low"
       ? raw.severity
       : "low",
@@ -257,6 +258,8 @@ export function normalizeFinding(raw: any, perspectiveId: string): ReviewFinding
     perspective: perspectiveId,
     foundBy: [perspectiveId],
   };
+
+  return validateSuggestion(normalized);
 }
 
 export function isValidFinding(f: ReviewFinding): boolean {

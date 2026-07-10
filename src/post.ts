@@ -3,6 +3,7 @@ import * as core from "@actions/core";
 import type { ConsolidatedReview, ReviewFinding, ReviewComment, DiffFile } from "./types.js";
 import { PERSPECTIVE_REGISTRY } from "./perspectives.js";
 import { isLineInDiff } from "./diff.js";
+import { isSuggestionBalanced } from "./suggestion.js";
 
 const REVIEW_SIGNATURE = "Livvie Code Review";
 
@@ -117,7 +118,9 @@ function buildComments(
       body: formatCommentBody(finding),
     };
 
-    if (finding.suggestion) {
+    const hasBalancedSuggestion = finding.suggestion && isSuggestionBalanced(finding.suggestion);
+
+    if (hasBalancedSuggestion) {
       const startLine = finding.suggestionStartLine ?? calculateStartLine(finding);
       if (startLine && startLine < finding.line) {
         comment.start_line = startLine;
@@ -159,8 +162,14 @@ function formatCommentBody(finding: ReviewFinding): string {
   parts.push(finding.description);
 
   if (finding.suggestion) {
+    const balanced = isSuggestionBalanced(finding.suggestion);
     parts.push("");
-    parts.push("```suggestion");
+    if (balanced) {
+      parts.push("```suggestion");
+    } else {
+      core.warning(`Posting unbalanced suggestion as plain code block: ${finding.file}:${finding.line}`);
+      parts.push("```dart");
+    }
     parts.push(finding.suggestion);
     parts.push("```");
   }
