@@ -5,6 +5,7 @@ import { Octokit } from "@octokit/rest";
 import { fetchDiff, formatDiffForPrompt } from "./diff.js";
 import { reviewWithLLM } from "./llm.js";
 import { postReview } from "./post.js";
+import type { StructuredReview } from "./types.js";
 
 async function run(): Promise<void> {
   try {
@@ -16,6 +17,7 @@ async function run(): Promise<void> {
     const maxDiffSize = parseInt(core.getInput("max-diff-size") || "50000", 10);
     const maxOutputTokens = parseInt(core.getInput("max-output-tokens") || "16000", 10);
     const reasoningEffort = core.getInput("reasoning-effort") || "none";
+    const fallbackModel = core.getInput("fallback-model") || "";
     const requestChangesOnHigh = core.getInput("request-changes-on-high") !== "false";
     const maxComments = parseInt(core.getInput("max-comments") || "25", 10);
 
@@ -51,16 +53,35 @@ async function run(): Promise<void> {
     const systemPrompt = loadSystemPrompt();
     const reviewInstructions = await loadReviewInstructions(octokit, owner, repo, context.pull_request.base.ref, reviewInstructionsFile);
 
-    const review = await reviewWithLLM(
-      llmApiKey,
-      llmBaseUrl,
-      model,
-      systemPrompt,
-      diffText,
-      reviewInstructions,
-      maxOutputTokens,
-      reasoningEffort
-    );
+    let review: StructuredReview;
+    try {
+      review = await reviewWithLLM(
+        llmApiKey,
+        llmBaseUrl,
+        model,
+        systemPrompt,
+        diffText,
+        reviewInstructions,
+        maxOutputTokens,
+        reasoningEffort
+      );
+    } catch (primaryError) {
+      if (!fallbackModel) throw primaryError;
+
+      core.warning(`Primary model ${model} failed: ${primaryError instanceof Error ? primaryError.message : String(primaryError)}`);
+      core.info(`Falling back to ${fallbackModel}...`);
+
+      review = await reviewWithLLM(
+        llmApiKey,
+        llmBaseUrl,
+        fallbackModel,
+        systemPrompt,
+        diffText,
+        reviewInstructions,
+        maxOutputTokens,
+        "none"
+      );
+    }
 
     core.info(`Review complete: ${review.findings.length} findings`);
 

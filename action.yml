@@ -36,6 +36,10 @@ inputs:
     description: "Reasoning effort level for models that support it (e.g. kimi-k2, deepseek-r1, glm-4.5). Options: none, low, medium, high, max. 'max' uses the maximum reasoning the model offers. Ignored by models that don't support reasoning."
     required: false
     default: "none"
+  fallback-model:
+    description: "Fallback model if the primary model fails after all retries. Set to empty to disable."
+    required: false
+    default: ""
   request-changes-on-high:
     description: "Post REQUEST_CHANGES when high-severity findings exist."
     required: false
