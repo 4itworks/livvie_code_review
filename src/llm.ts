@@ -236,6 +236,10 @@ export function extractJson(content: string): string | null {
 }
 
 export function normalizeFinding(raw: any, perspectiveId: string): ReviewFinding {
+  const hasSuggestion = raw.suggestion && String(raw.suggestion).trim().length > 0;
+  const line = Number(raw.line) || 0;
+  const suggestionStartLine = Number(raw.suggestion_start_line) || null;
+
   return {
     severity: raw.severity === "high" || raw.severity === "medium" || raw.severity === "low"
       ? raw.severity
@@ -244,10 +248,14 @@ export function normalizeFinding(raw: any, perspectiveId: string): ReviewFinding
       ? raw.confidence
       : "medium",
     file: String(raw.file || "").trim(),
-    line: Number(raw.line) || 0,
+    line,
     description: String(raw.description || "").trim(),
-    suggestion: raw.suggestion ? String(raw.suggestion).trim() : null,
+    suggestion: hasSuggestion ? String(raw.suggestion).trim() : null,
+    suggestionStartLine: hasSuggestion && suggestionStartLine && suggestionStartLine > 0 && suggestionStartLine < line
+      ? suggestionStartLine
+      : null,
     perspective: perspectiveId,
+    foundBy: [perspectiveId],
   };
 }
 

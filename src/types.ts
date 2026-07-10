@@ -13,7 +13,9 @@ export interface ReviewFinding {
   line: number;
   description: string;
   suggestion: string | null;
+  suggestionStartLine: number | null;
   perspective: string;
+  foundBy: string[];
 }
 
 export interface StructuredReview {
