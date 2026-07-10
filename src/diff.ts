@@ -41,11 +41,57 @@ export async function fetchDiff(
   return result;
 }
 
-export function formatDiffForPrompt(files: DiffFile[]): string {
+export async function fetchFileContents(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  ref: string,
+  files: DiffFile[]
+): Promise<Map<string, string>> {
+  const contents = new Map<string, string>();
+
+  for (const file of files) {
+    try {
+      const response = await octokit.rest.repos.getContent({
+        owner,
+        repo,
+        path: file.filename,
+        ref,
+      });
+
+      if ("content" in response.data && response.data.content) {
+        const text = Buffer.from(response.data.content, "base64").toString("utf8");
+        const numbered = text
+          .split("\n")
+          .map((line, i) => `${i + 1}: ${line}`)
+          .join("\n");
+        contents.set(file.filename, numbered);
+      }
+    } catch {
+      // File might be deleted or binary — skip
+    }
+  }
+
+  return contents;
+}
+
+export function formatDiffForPrompt(files: DiffFile[], fileContents: Map<string, string>): string {
   const parts: string[] = [];
 
   for (const file of files) {
     parts.push(`## ${file.filename}`);
+    parts.push("");
+
+    const content = fileContents.get(file.filename);
+    if (content) {
+      parts.push("### Full file (with line numbers)");
+      parts.push("```");
+      parts.push(content);
+      parts.push("```");
+      parts.push("");
+    }
+
+    parts.push("### Diff");
     parts.push("```diff");
     parts.push(file.patch);
     parts.push("```");

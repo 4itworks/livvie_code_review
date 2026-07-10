@@ -98,7 +98,7 @@ Never include comments like "// do this instead" inside the suggestion. Pure cod
 **Never alter indentation or whitespace from the original code.** Match the exact indentation of the lines you are replacing.
 
 ### Line numbers
-The "line" field must be a line number that exists in the NEW version of the file (the right side of the diff). Use the line numbers shown in the diff hunks after the "+" marker.
+The "line" field must be a line number that exists in the NEW version of the file (the right side of the diff). You are given the full file content with line numbers prefixed (e.g. `281:     if (location.id == null) {`). Use those line numbers to determine the exact `line` value.
 
 ### What not to flag
 - Import ordering

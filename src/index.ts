@@ -2,7 +2,7 @@ import * as core from "@actions/core";
 import * as fs from "fs";
 import * as path from "path";
 import { Octokit } from "@octokit/rest";
-import { fetchDiff, formatDiffForPrompt } from "./diff.js";
+import { fetchDiff, fetchFileContents, formatDiffForPrompt } from "./diff.js";
 import { reviewWithLLM } from "./llm.js";
 import { postReview } from "./post.js";
 import type { StructuredReview } from "./types.js";
@@ -49,7 +49,10 @@ async function run(): Promise<void> {
 
     core.info(`Found ${files.length} files with diffs`);
 
-    const diffText = formatDiffForPrompt(files);
+    const prHeadRef = context.pull_request?.head?.ref;
+    const fileContents = await fetchFileContents(octokit, owner, repo, prHeadRef, files);
+
+    const diffText = formatDiffForPrompt(files, fileContents);
     const systemPrompt = loadSystemPrompt();
     const reviewInstructions = await loadReviewInstructions(octokit, owner, repo, context.pull_request.base.ref, reviewInstructionsFile);
 
