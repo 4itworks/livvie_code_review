@@ -33,7 +33,7 @@ inputs:
     required: false
     default: "16000"
   reasoning-effort:
-    description: "Reasoning effort level for models that support it (e.g. kimi-k2, deepseek-r1, glm-4.5). Set to 'none' to disable. Ignored by models that don't support reasoning."
+    description: "Reasoning effort level for models that support it (e.g. kimi-k2, deepseek-r1, glm-4.5). Options: none, low, medium, high, max. 'max' uses the maximum reasoning the model offers. Ignored by models that don't support reasoning."
     required: false
     default: "none"
   request-changes-on-high:

@@ -22,6 +22,13 @@ export async function reviewWithLLM(
   core.info(`Diff size: ${diffText.length} chars`);
   if (reasoningEffort !== "none") {
     core.info(`Reasoning effort: ${reasoningEffort}`);
+    if (reasoningEffort === "max" && maxOutputTokens < 64000) {
+      core.warning(
+        `reasoning-effort=max with max-output-tokens=${maxOutputTokens} — ` +
+        `reasoning tokens count toward the output limit. ` +
+        `Consider increasing max-output-tokens to 64000+ to avoid truncated reviews.`
+      );
+    }
   }
 
   const requestBody: Record<string, unknown> = {
