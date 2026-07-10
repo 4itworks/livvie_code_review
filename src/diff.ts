@@ -61,9 +61,14 @@ export async function fetchFileContents(
 
       if ("content" in response.data && response.data.content) {
         const text = Buffer.from(response.data.content, "base64").toString("utf8");
+        const changedLines = extractChangedLines(file.patch);
         const numbered = text
           .split("\n")
-          .map((line, i) => `${i + 1}: ${line}`)
+          .map((line, i) => {
+            const lineNum = i + 1;
+            const marker = changedLines.has(lineNum) ? " →" : "";
+            return `${lineNum}:${marker} ${line}`;
+          })
           .join("\n");
         contents.set(file.filename, numbered);
       }
@@ -73,6 +78,37 @@ export async function fetchFileContents(
   }
 
   return contents;
+}
+
+function extractChangedLines(patch: string): Set<number> {
+  const lines = new Set<number>();
+  let currentLine = 0;
+  let inHunk = false;
+
+  for (const line of patch.split("\n")) {
+    if (line.startsWith("@@")) {
+      const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+      if (match) {
+        currentLine = parseInt(match[1], 10);
+      }
+      inHunk = true;
+      continue;
+    }
+
+    if (!inHunk) continue;
+    if (line.startsWith("\\")) continue;
+
+    if (line.startsWith("+")) {
+      lines.add(currentLine);
+      currentLine++;
+    } else if (line.startsWith("-")) {
+      // removed line, don't advance
+    } else {
+      currentLine++;
+    }
+  }
+
+  return lines;
 }
 
 export function formatDiffForPrompt(files: DiffFile[], fileContents: Map<string, string>): string {
@@ -126,7 +162,7 @@ export function isLineInDiff(patch: string, targetLine: number): boolean {
     } else if (line.startsWith("-")) {
       // removed line, don't advance
     } else {
-      if (currentLine === targetLine) return true;
+      // context line — advance but don't accept as target
       currentLine++;
     }
   }

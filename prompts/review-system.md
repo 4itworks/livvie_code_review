@@ -100,6 +100,8 @@ Never include comments like "// do this instead" inside the suggestion. Pure cod
 ### Line numbers
 The "line" field must be a line number that exists in the NEW version of the file (the right side of the diff). You are given the full file content with line numbers prefixed (e.g. `281:     if (location.id == null) {`). Use those line numbers to determine the exact `line` value.
 
+**CRITICAL: Only flag lines marked with → (the changed lines).** In the full file content, lines that were added or modified in this PR are marked with `→` after the line number (e.g. `281: →     if (location.id == null) {`). You may use surrounding unmarked lines as CONTEXT for your suggestion, but the `line` field must point to a marked line. Never report findings on unmarked lines — those are pre-existing code outside the scope of this PR.
+
 ### What not to flag
 - Import ordering
 - Style that matches existing patterns in the same file
