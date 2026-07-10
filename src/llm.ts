@@ -62,7 +62,6 @@ export async function reviewWithLLM(
           "X-Title": "livvie-code-review",
         },
         body,
-        signal: AbortSignal.timeout(900000),
       });
 
       if (!response.ok) {
