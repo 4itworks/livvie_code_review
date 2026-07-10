@@ -20,7 +20,12 @@ export async function postReview(
   const body = buildReviewBody(consolidated, postedFindings);
 
   const hasHigh = consolidated.findings.some((f) => f.severity === "high");
-  const event = hasHigh && requestChangesOnHigh ? "REQUEST_CHANGES" : "COMMENT";
+  const hasFindings = consolidated.findings.length > 0;
+  const event = hasHigh && requestChangesOnHigh
+    ? "REQUEST_CHANGES"
+    : hasFindings
+      ? "COMMENT"
+      : "APPROVE";
 
   core.info(`Posting ${event} review with ${comments.length} inline comments...`);
 
@@ -309,10 +314,10 @@ async function dismissStaleReviews(
               message: "Superseded by a newer review.",
             });
             core.info(`Dismissed stale review #${review.id} (CHANGES_REQUESTED)`);
-          } else if (review.state === "COMMENTED") {
+          } else if (review.state === "COMMENTED" || review.state === "APPROVED") {
             await deleteReviewComments(octokit, owner, repo, pullNumber, review.id);
             await updateReviewBody(octokit, owner, repo, pullNumber, review.id);
-            core.info(`Cleaned up stale review #${review.id} (COMMENTED)`);
+            core.info(`Cleaned up stale review #${review.id} (${review.state})`);
           }
         } catch (error) {
           core.warning(`Could not clean up stale review #${review.id}: ${error}`);

@@ -35,7 +35,8 @@ Most AI code review tools post code fixes as generic code blocks. Livvie Code Re
 - **Multi-perspective specialist reviewers** — choose from 5 specialized review angles: code-quality, security, performance, architecture, and generalist
 - **Batching for large PRs** — files are bin-packed by token budget, so even 100-file PRs get reviewed without context truncation
 - **Suggestion blocks** — every code fix renders as an inline "Accept" button in the PR diff
-- **REQUEST_CHANGES** — high-severity findings block the PR until resolved
+- **REQUEST_CHANGES** — high-severity findings block the PR until resolved (configurable via `request-changes-on-high`)
+- **APPROVE** — PRs with zero findings are approved automatically
 - **Inline comments** — findings are posted on the exact line in the diff, not in the review body
 - **Perspective attribution** — each finding shows which specialist reviewer found it
 - **Deduplication** — findings from multiple perspectives on the same line are merged
