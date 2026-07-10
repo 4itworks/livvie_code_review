@@ -1,0 +1,4 @@
+# These owners will be automatically requested for review
+# when pull requests modify code in these paths.
+
+* @joaopereirajp

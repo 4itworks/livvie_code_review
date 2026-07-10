@@ -20,7 +20,12 @@ export async function postReview(
   const body = buildReviewBody(consolidated, postedFindings);
 
   const hasHigh = consolidated.findings.some((f) => f.severity === "high");
-  const event = hasHigh && requestChangesOnHigh ? "REQUEST_CHANGES" : "COMMENT";
+  const hasFindings = consolidated.findings.length > 0;
+  const event = hasHigh && requestChangesOnHigh
+    ? "REQUEST_CHANGES"
+    : hasFindings
+      ? "COMMENT"
+      : "APPROVE";
 
   core.info(`Posting ${event} review with ${comments.length} inline comments...`);
 
@@ -113,7 +118,7 @@ function buildComments(
     };
 
     if (finding.suggestion) {
-      const startLine = calculateStartLine(finding);
+      const startLine = finding.suggestionStartLine ?? calculateStartLine(finding);
       if (startLine && startLine < finding.line) {
         comment.start_line = startLine;
         comment.start_side = "RIGHT";
@@ -139,7 +144,13 @@ function calculateStartLine(finding: ReviewFinding): number | undefined {
 function formatCommentBody(finding: ReviewFinding): string {
   const severityBadge = severityBadgeMap[finding.severity];
   const confidenceIcon = confidenceIconMap[finding.confidence];
-  const perspectiveName = PERSPECTIVE_REGISTRY[finding.perspective]?.name ?? finding.perspective;
+
+  const perspectiveNames = finding.foundBy.map(
+    (id) => PERSPECTIVE_REGISTRY[id]?.name ?? id
+  );
+  const attribution = perspectiveNames.length > 1
+    ? `Found by: ${perspectiveNames.join(", ")}`
+    : `Found by: **${perspectiveNames[0]}**`;
 
   const parts: string[] = [];
   parts.push(`${severityBadge} **Severity: ${finding.severity.toUpperCase()}**`);
@@ -155,7 +166,7 @@ function formatCommentBody(finding: ReviewFinding): string {
   }
 
   parts.push("");
-  parts.push(`— Found by: **${perspectiveName}**`);
+  parts.push(`— ${attribution}`);
 
   return parts.join("\n");
 }
@@ -210,15 +221,15 @@ function buildReviewBody(
   if (posted.length > 0) {
     parts.push("### 📋 Posted findings");
     parts.push("");
-    parts.push("| # | Severity | Confidence | File | Line | Perspective |");
+    parts.push("| # | Severity | Confidence | File | Line | Perspectives |");
     parts.push("|---|---|---|---|---|---|");
     for (let i = 0; i < posted.length; i++) {
       const f = posted[i];
       const sevBadge = severityBadgeMap[f.severity];
       const confIcon = confidenceIconMap[f.confidence];
       const shortFile = f.file.split("/").pop() ?? f.file;
-      const perspName = PERSPECTIVE_REGISTRY[f.perspective]?.name ?? f.perspective;
-      parts.push(`| **${i + 1}** | ${sevBadge} ${f.severity} | ${confIcon} ${f.confidence} | \`${shortFile}\` | ${f.line} | ${perspName} |`);
+      const perspNames = f.foundBy.map((id) => PERSPECTIVE_REGISTRY[id]?.name ?? id).join(", ");
+      parts.push(`| **${i + 1}** | ${sevBadge} ${f.severity} | ${confIcon} ${f.confidence} | \`${shortFile}\` | ${f.line} | ${perspNames} |`);
     }
     parts.push("");
   }
@@ -232,8 +243,8 @@ function buildReviewBody(
       const f = unposted[i];
       const sevBadge = severityBadgeMap[f.severity];
       const confIcon = confidenceIconMap[f.confidence];
-      const perspName = PERSPECTIVE_REGISTRY[f.perspective]?.name ?? f.perspective;
-      parts.push(`${sevBadge} **${i + 1}** — \`${f.file}:${f.line}\` · ${confIcon} ${f.confidence} · Found by: ${perspName}`);
+      const perspNames = f.foundBy.map((id) => PERSPECTIVE_REGISTRY[id]?.name ?? id).join(", ");
+      parts.push(`${sevBadge} **${i + 1}** — \`${f.file}:${f.line}\` · ${confIcon} ${f.confidence} · Found by: ${perspNames}`);
       parts.push("");
       parts.push(f.description);
       if (f.suggestion) {
@@ -290,25 +301,78 @@ async function dismissStaleReviews(
     for (const review of reviews) {
       if (
         review.id !== currentReviewId &&
-        review.state === "CHANGES_REQUESTED" &&
         review.user?.type === "Bot" &&
         (review.body || "").includes(REVIEW_SIGNATURE)
       ) {
         try {
-          await octokit.rest.pulls.dismissReview({
-            owner,
-            repo,
-            pull_number: pullNumber,
-            review_id: review.id,
-            message: "Superseded by a newer review.",
-          });
-          core.info(`Dismissed stale review #${review.id}`);
+          if (review.state === "CHANGES_REQUESTED") {
+            await octokit.rest.pulls.dismissReview({
+              owner,
+              repo,
+              pull_number: pullNumber,
+              review_id: review.id,
+              message: "Superseded by a newer review.",
+            });
+            core.info(`Dismissed stale review #${review.id} (CHANGES_REQUESTED)`);
+          } else if (review.state === "COMMENTED" || review.state === "APPROVED") {
+            await deleteReviewComments(octokit, owner, repo, pullNumber, review.id);
+            await updateReviewBody(octokit, owner, repo, pullNumber, review.id);
+            core.info(`Cleaned up stale review #${review.id} (${review.state})`);
+          }
         } catch (error) {
-          core.warning(`Could not dismiss stale review #${review.id}: ${error}`);
+          core.warning(`Could not clean up stale review #${review.id}: ${error}`);
         }
       }
     }
   } catch (error) {
     core.warning(`Could not check for stale reviews: ${error}`);
+  }
+}
+
+async function deleteReviewComments(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  reviewId: number
+): Promise<void> {
+  const comments = await octokit.paginate(octokit.rest.pulls.listCommentsForReview, {
+    owner,
+    repo,
+    pull_number: pullNumber,
+    review_id: reviewId,
+    per_page: 100,
+  });
+
+  for (const comment of comments) {
+    try {
+      await octokit.rest.pulls.deleteReviewComment({
+        owner,
+        repo,
+        comment_id: comment.id,
+      });
+    } catch (error) {
+      core.warning(`Could not delete comment ${comment.id}: ${error}`);
+    }
+  }
+}
+
+async function updateReviewBody(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  reviewId: number
+): Promise<void> {
+  try {
+    await octokit.rest.pulls.updateReview({
+      owner,
+      repo,
+      pull_number: pullNumber,
+      review_id: reviewId,
+      body: `*Superseded by a newer review. Inline comments have been removed.*`,
+    });
+  } catch (error) {
+    core.warning(`Could not update review body #${reviewId}: ${error}`);
   }
 }

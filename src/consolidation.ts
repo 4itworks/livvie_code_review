@@ -6,7 +6,6 @@ import type {
   Perspective,
   ReviewStats,
 } from "./types.js";
-import { PERSPECTIVE_REGISTRY } from "./perspectives.js";
 
 const SEVERITY_ORDER: Record<string, number> = {
   high: 3,
@@ -63,47 +62,28 @@ export function deduplicateFindings(findings: ReviewFinding[]): ReviewFinding[] 
   });
 
   const result: ReviewFinding[] = [];
-  const duplicatesMap: Map<number, string[]> = new Map();
 
-  for (let i = 0; i < sorted.length; i++) {
-    const current = sorted[i];
+  for (const current of sorted) {
     let merged = false;
 
     for (let j = 0; j < result.length; j++) {
       const existing = result[j];
       if (areFindingsDuplicate(current, existing)) {
-        const currentWins = compareFindings(current, existing) > 0;
-        if (currentWins) {
-          result[j] = { ...current };
-          const tags = duplicatesMap.get(j) ?? [];
-          tags.push(existing.perspective);
-          duplicatesMap.set(j, tags);
-        } else {
-          const tags = duplicatesMap.get(j) ?? [];
-          tags.push(current.perspective);
-          duplicatesMap.set(j, tags);
-        }
+        const winner = compareFindings(current, existing) > 0 ? current : existing;
+        const loser = winner === current ? existing : current;
+        const foundBy = Array.from(new Set<string>([...winner.foundBy, ...loser.foundBy]));
+
+        result[j] = {
+          ...winner,
+          foundBy: [...foundBy],
+        };
         merged = true;
         break;
       }
     }
 
     if (!merged) {
-      result.push({ ...current });
-      duplicatesMap.set(result.length - 1, []);
-    }
-  }
-
-  for (let i = 0; i < result.length; i++) {
-    const tags = duplicatesMap.get(i);
-    if (tags && tags.length > 0) {
-      const perspectiveNames = tags.map(
-        (id) => PERSPECTIVE_REGISTRY[id]?.name ?? id
-      );
-      result[i] = {
-        ...result[i],
-        description: `${result[i].description}\n\n*Also identified by: ${perspectiveNames.join(", ")}*`,
-      };
+      result.push({ ...current, foundBy: [...current.foundBy] });
     }
   }
 
