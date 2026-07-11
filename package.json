@@ -16,8 +16,8 @@
     "lint:fix": "eslint src/ --fix"
   },
   "dependencies": {
-    "@actions/core": "^1.11.0",
-    "@actions/github": "^6.0.0",
+    "@actions/core": "^3.0.1",
+    "@actions/github": "^9.1.1",
     "@octokit/rest": "^21.0.0",
     "gpt-tokenizer": "^2.5.0"
   },
