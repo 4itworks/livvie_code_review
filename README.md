@@ -28,8 +28,11 @@
 - [Review Perspectives](#review-perspectives)
 - [Setup](#setup)
 - [Inputs](#inputs)
+- [Outputs](#outputs)
 - [Cost Control](#cost-control)
 - [Supported Providers](#supported-providers)
+- [Development](#development)
+- [Branch Protection](#branch-protection)
 - [License](#license)
 
 ## Why
@@ -232,6 +235,28 @@ Any OpenAI-compatible API works out of the box:
 | Groq | `https://api.groq.com/openai/v1` | Fast inference for cheaper models |
 | Ollama | `http://localhost:11434/v1` | Local models, self-hosted |
 
+## Development
+
+```bash
+npm ci                      # Install dependencies
+npm test                    # Run tests (vitest)
+npm run test:coverage       # Run tests with coverage report
+npm run typecheck           # Type check (tsc --noEmit)
+npm run format              # Format code (prettier)
+npm run format:check        # Check formatting (CI)
+npm run build               # Build dist/index.js (ncc)
+```
+
+### Pre-commit checklist
+
+Before pushing, run:
+
+```bash
+npm run format && npm run typecheck && npm test && npm run build
+```
+
+CI runs `lint`, `typecheck`, `test`, and `build-check` in parallel — all must pass before merge.
+
 ## Branch Protection
 
 To require CI checks before merging PRs, enable branch protection on `main`:
@@ -239,10 +264,10 @@ To require CI checks before merging PRs, enable branch protection on `main`:
 1. Go to **Settings → Branches → Add rule**
 2. Set **Branch name pattern** to `main`
 3. Enable **Require status checks to pass before merging**
-4. Select these required checks: `typecheck`, `test`, `build-check`
+4. Select these required checks: `lint`, `typecheck`, `test`, `build-check`
 5. Enable **Require branches to be up to date before merging**
 
-This ensures every PR passes typecheck, tests, and build verification before merge. The `self-test` (LLM smoke) job is informational only — it doesn't block merges since it requires an API key.
+This ensures every PR passes formatting, typecheck, tests, and build verification before merge.
 
 ## License
 
