@@ -280,7 +280,9 @@ export function getPerspectives(ids: string[]): Perspective[] {
     if (perspective) {
       result.push(perspective);
     } else {
-      core.warning(`Unknown perspective "${id}" — skipping. Available: ${Object.keys(PERSPECTIVE_REGISTRY).join(", ")}`);
+      core.warning(
+        `Unknown perspective "${id}" — skipping. Available: ${Object.keys(PERSPECTIVE_REGISTRY).join(", ")}`,
+      );
     }
   }
   return result;

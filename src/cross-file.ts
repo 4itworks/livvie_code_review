@@ -15,7 +15,7 @@ function compactHunkSummary(patch: string): string {
 export function buildCrossFileContext(
   allBatches: Batch[],
   currentBatch: Batch,
-  maxTokens: number
+  maxTokens: number,
 ): string {
   const otherBatches = allBatches.filter((b) => b.index !== currentBatch.index);
   if (otherBatches.length === 0) return "";

@@ -9,9 +9,7 @@ import { parsePerspectivesInput } from "./perspectives.js";
 async function run(): Promise<void> {
   try {
     const context = JSON.parse(
-      process.env.GITHUB_EVENT_PATH
-        ? fs.readFileSync(process.env.GITHUB_EVENT_PATH, "utf8")
-        : "{}"
+      process.env.GITHUB_EVENT_PATH ? fs.readFileSync(process.env.GITHUB_EVENT_PATH, "utf8") : "{}",
     );
     const pullNumber = context.pull_request?.number;
     if (!pullNumber) {
@@ -26,7 +24,8 @@ async function run(): Promise<void> {
     }
 
     const githubToken = core.getInput("github-token", { required: true });
-    const reviewInstructionsFile = core.getInput("review-instructions-file") || ".github/code-reviewer.md";
+    const reviewInstructionsFile =
+      core.getInput("review-instructions-file") || ".github/code-reviewer.md";
     const prBaseRef = context.pull_request?.base?.ref ?? "main";
 
     const octokit = new Octokit({ auth: githubToken });
@@ -35,7 +34,7 @@ async function run(): Promise<void> {
       owner,
       repo,
       prBaseRef,
-      reviewInstructionsFile
+      reviewInstructionsFile,
     );
 
     function parsePositiveInt(value: string, name: string, defaultValue: number): number {
@@ -57,14 +56,17 @@ async function run(): Promise<void> {
       llmBaseUrl: core.getInput("llm-base-url", { required: true }),
       model: core.getInput("model", { required: true }),
       fallbackModel: core.getInput("fallback-model") || "",
-      maxOutputTokens: parsePositiveInt(core.getInput("max-output-tokens"), "max-output-tokens", 16000),
+      maxOutputTokens: parsePositiveInt(
+        core.getInput("max-output-tokens"),
+        "max-output-tokens",
+        16000,
+      ),
       reasoningEffort: core.getInput("reasoning-effort") || "none",
       maxDiffSize: parsePositiveInt(core.getInput("max-diff-size"), "max-diff-size", 50000),
       maxBatches: parsePositiveInt(core.getInput("max-batches"), "max-batches", 0),
       contextWindow: parsePositiveInt(core.getInput("context-window"), "context-window", 128000),
       ignorePatterns: parseIgnorePatterns(
-        core.getInput("ignore-patterns") ||
-          "build/**,dist/**,node_modules/**"
+        core.getInput("ignore-patterns") || "build/**,dist/**,node_modules/**",
       ),
       perspectives: parsePerspectivesInput(core.getInput("perspectives") || "generalist"),
       reviewInstructions,
@@ -104,7 +106,7 @@ async function loadReviewInstructions(
   owner: string,
   repo: string,
   ref: string,
-  filePath: string
+  filePath: string,
 ): Promise<string> {
   try {
     const response = await octokit.rest.repos.getContent({

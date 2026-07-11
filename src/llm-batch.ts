@@ -6,7 +6,12 @@ import type {
   Semaphore,
   StructuredReview,
 } from "./types.js";
-import { createCircuitBreaker, calculateBackoff, parseRetryAfter, sleep } from "./circuit-breaker.js";
+import {
+  createCircuitBreaker,
+  calculateBackoff,
+  parseRetryAfter,
+  sleep,
+} from "./circuit-breaker.js";
 import { parseReview } from "./llm.js";
 
 export interface LLMCallConfig {
@@ -25,7 +30,7 @@ export interface LLMCallConfig {
 export async function reviewBatchFromPerspective(
   batch: Batch,
   perspective: Perspective,
-  config: LLMCallConfig
+  config: LLMCallConfig,
 ): Promise<BatchReviewResult> {
   const skipPrimary = config.circuitBreaker.check();
   const release = await config.semaphore.acquire();
@@ -49,12 +54,14 @@ export async function reviewBatchFromPerspective(
           config.maxOutputTokens,
           config.reasoningEffort,
           config.maxRetries,
-          config.circuitBreaker
+          config.circuitBreaker,
         );
         config.circuitBreaker.recordSuccess();
         review = parseReview(result.content, perspective.id);
         modelUsed = result.modelUsed;
-        core.info(`Batch ${batch.index} / ${perspective.name}: primary model succeeded (${review.findings.length} findings)`);
+        core.info(
+          `Batch ${batch.index} / ${perspective.name}: primary model succeeded (${review.findings.length} findings)`,
+        );
       } catch (primaryError) {
         config.circuitBreaker.recordFailure();
         const msg = primaryError instanceof Error ? primaryError.message : String(primaryError);
@@ -62,7 +69,9 @@ export async function reviewBatchFromPerspective(
         error = `Primary model: ${msg}`;
       }
     } else {
-      core.info(`Batch ${batch.index} / ${perspective.name}: circuit breaker open, skipping primary model`);
+      core.info(
+        `Batch ${batch.index} / ${perspective.name}: circuit breaker open, skipping primary model`,
+      );
       error = "Circuit breaker open — primary model skipped";
     }
 
@@ -77,16 +86,20 @@ export async function reviewBatchFromPerspective(
           config.maxOutputTokens,
           "none",
           config.maxRetries,
-          config.circuitBreaker
+          config.circuitBreaker,
         );
         config.circuitBreaker.recordSuccess();
         review = parseReview(result.content, perspective.id);
         modelUsed = result.modelUsed;
         usedFallback = true;
-        core.info(`Batch ${batch.index} / ${perspective.name}: fallback model succeeded (${review.findings.length} findings)`);
+        core.info(
+          `Batch ${batch.index} / ${perspective.name}: fallback model succeeded (${review.findings.length} findings)`,
+        );
       } catch (fallbackError) {
         const msg = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
-        core.warning(`Batch ${batch.index} / ${perspective.name}: fallback model also failed — ${msg}`);
+        core.warning(
+          `Batch ${batch.index} / ${perspective.name}: fallback model also failed — ${msg}`,
+        );
         error = error ? `${error}; Fallback model: ${msg}` : `Fallback model: ${msg}`;
       }
     }
@@ -121,10 +134,7 @@ export async function reviewBatchFromPerspective(
   }
 }
 
-export function buildBatchUserMessage(
-  batch: Batch,
-  reviewInstructions: string
-): string {
+export function buildBatchUserMessage(batch: Batch, reviewInstructions: string): string {
   const parts: string[] = [];
 
   if (reviewInstructions.trim()) {
@@ -166,7 +176,7 @@ export async function callLLMWithRetry(
   maxOutputTokens: number,
   reasoningEffort: string,
   maxRetries: number,
-  circuitBreaker: ReturnType<typeof createCircuitBreaker>
+  circuitBreaker: ReturnType<typeof createCircuitBreaker>,
 ): Promise<{ content: string; modelUsed: string }> {
   const requestBody: Record<string, unknown> = {
     model,
@@ -211,11 +221,15 @@ export async function callLLMWithRetry(
         const errorText = await response.text();
         const retryAfter = parseRetryAfter(response.headers.get("retry-after"));
         if (retryAfter !== null && attempt < maxRetries) {
-          core.warning(`LLM API ${response.status} (attempt ${attempt}/${maxRetries}). Retry-After: ${retryAfter}ms. Waiting...`);
+          core.warning(
+            `LLM API ${response.status} (attempt ${attempt}/${maxRetries}). Retry-After: ${retryAfter}ms. Waiting...`,
+          );
           await sleep(retryAfter);
           continue;
         }
-        const sanitizedError = errorText.replace(/Bearer\s+[\w-]+/gi, "Bearer [REDACTED]").slice(0, 500);
+        const sanitizedError = errorText
+          .replace(/Bearer\s+[\w-]+/gi, "Bearer [REDACTED]")
+          .slice(0, 500);
         throw new Error(`LLM API error ${response.status}: ${sanitizedError}`);
       }
 
@@ -227,7 +241,7 @@ export async function callLLMWithRetry(
       } catch {
         throw new Error(
           `LLM returned truncated or invalid JSON response (${responseText.length} chars). ` +
-          `Preview: ${responseText.slice(0, 200)}...`
+            `Preview: ${responseText.slice(0, 200)}...`,
         );
       }
 
@@ -236,9 +250,10 @@ export async function callLLMWithRetry(
       const finishReason = data.choices?.[0]?.finish_reason;
 
       if (!content || content.length < 20) {
-        const detail = finishReason === "length"
-          ? `Model hit token limit (finish_reason: length). Reasoning consumed all ${maxOutputTokens} tokens with none left for output. Increase max-output-tokens or reduce reasoning-effort.`
-          : `content too short (${content?.length || 0} chars, finish_reason: ${finishReason || "unknown"})`;
+        const detail =
+          finishReason === "length"
+            ? `Model hit token limit (finish_reason: length). Reasoning consumed all ${maxOutputTokens} tokens with none left for output. Increase max-output-tokens or reduce reasoning-effort.`
+            : `content too short (${content?.length || 0} chars, finish_reason: ${finishReason || "unknown"})`;
         throw new Error(`LLM returned empty/short response: ${detail}`);
       }
 
@@ -248,9 +263,10 @@ export async function callLLMWithRetry(
 
       if (reasoningContent && process.env.LIVVIE_VERBOSE === "1") {
         core.info("=== Reasoning trace ===");
-        const trace = reasoningContent.length > 2000
-          ? reasoningContent.slice(0, 2000) + "...(truncated)"
-          : reasoningContent;
+        const trace =
+          reasoningContent.length > 2000
+            ? reasoningContent.slice(0, 2000) + "...(truncated)"
+            : reasoningContent;
         core.info(trace);
         core.info("=== End reasoning trace ===");
       }
@@ -261,7 +277,9 @@ export async function callLLMWithRetry(
 
       if (attempt < maxRetries) {
         const delay = calculateBackoff(attempt);
-        core.warning(`LLM request failed (attempt ${attempt}/${maxRetries}): ${lastError.message}. Retrying in ${Math.round(delay / 1000)}s...`);
+        core.warning(
+          `LLM request failed (attempt ${attempt}/${maxRetries}): ${lastError.message}. Retrying in ${Math.round(delay / 1000)}s...`,
+        );
         await sleep(delay);
       }
     }

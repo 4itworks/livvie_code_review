@@ -91,7 +91,7 @@ export function validateSuggestion(finding: ReviewFinding): ReviewFinding {
   if (!isSuggestionBalanced(finding.suggestion)) {
     core.warning(
       `Stripped unbalanced suggestion for ${finding.file}:${finding.line} — ` +
-      `braces/brackets/parentheses do not match. The finding description is kept.`
+        `braces/brackets/parentheses do not match. The finding description is kept.`,
     );
     return { ...finding, suggestion: null, suggestionStartLine: null };
   }

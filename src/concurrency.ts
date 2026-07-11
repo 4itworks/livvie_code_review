@@ -38,7 +38,7 @@ export function createSemaphore(maxConcurrency: number): Semaphore {
 export async function mapWithConcurrency<T, R>(
   items: readonly T[],
   mapper: (item: T, index: number) => Promise<R>,
-  concurrency: number
+  concurrency: number,
 ): Promise<R[]> {
   const semaphore = createSemaphore(concurrency);
   const promises = items.map((item, index) =>
@@ -49,9 +49,7 @@ export async function mapWithConcurrency<T, R>(
       } finally {
         release();
       }
-    })()
+    })(),
   );
   return Promise.all(promises);
 }
-
-

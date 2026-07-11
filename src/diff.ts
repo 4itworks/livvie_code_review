@@ -9,7 +9,7 @@ export async function fetchDiff(
   owner: string,
   repo: string,
   pullNumber: number,
-  maxDiffSize: number
+  maxDiffSize: number,
 ): Promise<DiffFile[]> {
   const files = await octokit.paginate(octokit.rest.pulls.listFiles, {
     owner,
@@ -50,7 +50,7 @@ export async function fetchFileContentsParallel(
   repo: string,
   ref: string,
   files: DiffFile[],
-  concurrency: number
+  concurrency: number,
 ): Promise<Map<string, string>> {
   const contents = new Map<string, string>();
 
@@ -84,7 +84,7 @@ export async function fetchFileContentsParallel(
       }
       return { filename: file.filename, content: "" };
     },
-    concurrency
+    concurrency,
   );
 
   for (const { filename, content } of results) {

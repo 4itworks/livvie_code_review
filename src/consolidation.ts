@@ -23,7 +23,7 @@ const MAX_SUMMARY_WORDS = 150;
 
 export function consolidateReviews(
   matrixResult: ReviewMatrixResult,
-  perspectives: Perspective[]
+  perspectives: Perspective[],
 ): ConsolidatedReview {
   const deduplicated = deduplicateFindings(matrixResult.rawFindings);
   const sorted = sortFindings(deduplicated);
@@ -123,7 +123,7 @@ export function sortFindings(findings: ReviewFinding[]): ReviewFinding[] {
 
 export function capFindings(
   findings: ReviewFinding[],
-  max: number
+  max: number,
 ): { kept: ReviewFinding[]; dropped: ReviewFinding[] } {
   if (findings.length <= max) {
     return { kept: [...findings], dropped: [] };
@@ -134,10 +134,7 @@ export function capFindings(
   };
 }
 
-export function mergeSummaries(
-  results: ReviewMatrixResult,
-  perspectives: Perspective[]
-): string {
+export function mergeSummaries(results: ReviewMatrixResult, perspectives: Perspective[]): string {
   const successful = results.results.filter((r) => !r.error);
   if (successful.length === 0) {
     return "Review completed but no perspectives produced results.";
@@ -202,13 +199,13 @@ function countFindings(results: ReviewMatrixResult): number {
 
 export function buildPerspectiveSummaries(
   results: ReviewMatrixResult,
-  perspectives: Perspective[]
+  perspectives: Perspective[],
 ): PerspectiveSummary[] {
   const summaries: PerspectiveSummary[] = [];
 
   for (const perspective of perspectives) {
     const perspectiveResults = results.results.filter(
-      (r) => r.perspectiveId === perspective.id && !r.error
+      (r) => r.perspectiveId === perspective.id && !r.error,
     );
 
     const allFindings: ReviewFinding[] = [];

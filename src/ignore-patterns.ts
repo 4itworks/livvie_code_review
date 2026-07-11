@@ -53,7 +53,7 @@ export function shouldIgnoreFile(filename: string, patterns: string[]): boolean 
 
 export function filterIgnoredFiles(
   files: DiffFile[],
-  patterns: string[]
+  patterns: string[],
 ): { kept: DiffFile[]; ignored: DiffFile[] } {
   const kept: DiffFile[] = [];
   const ignored: DiffFile[] = [];

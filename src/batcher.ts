@@ -25,7 +25,7 @@ function formatFileSection(file: PreparedFile): string {
 export function prepareFiles(
   files: DiffFile[],
   fileContents: Map<string, string>,
-  tokenBudget: TokenBudget
+  tokenBudget: TokenBudget,
 ): PreparedFile[] {
   const prepared: PreparedFile[] = [];
 
@@ -61,10 +61,10 @@ export function prepareFiles(
 export function binPackFiles(
   preparedFiles: PreparedFile[],
   tokenBudget: TokenBudget,
-  maxBatches: number
+  maxBatches: number,
 ): Batch[] {
   const sorted = [...preparedFiles].sort((a, b) =>
-    a.filename < b.filename ? -1 : a.filename > b.filename ? 1 : 0
+    a.filename < b.filename ? -1 : a.filename > b.filename ? 1 : 0,
   );
 
   const batches: Batch[] = [];
@@ -102,7 +102,7 @@ export function binPackFiles(
       if (lastBatch.tokenCount + file.tokenCount > tokenBudget.fileBudget * 2) {
         core.warning(
           `Batch ${lastBatch.index} overflow: ${lastBatch.tokenCount} + ${file.tokenCount} tokens exceeds 2x budget (${tokenBudget.fileBudget}). ` +
-          `File ${file.filename} may cause LLM truncation. Consider increasing max-batches.`
+            `File ${file.filename} may cause LLM truncation. Consider increasing max-batches.`,
         );
       }
       lastBatch.files.push(file);
@@ -124,16 +124,9 @@ export function binPackFiles(
   return batches;
 }
 
-export function assignCrossFileContext(
-  batches: Batch[],
-  tokenBudget: TokenBudget
-): void {
+export function assignCrossFileContext(batches: Batch[], tokenBudget: TokenBudget): void {
   for (const batch of batches) {
-    const crossContext = buildCrossFileContext(
-      batches,
-      batch,
-      tokenBudget.crossFileHunksTokens
-    );
+    const crossContext = buildCrossFileContext(batches, batch, tokenBudget.crossFileHunksTokens);
     batch.crossFileContext = crossContext;
     batch.totalTokenCount = batch.tokenCount + countTokens(crossContext);
   }
@@ -143,7 +136,7 @@ export function createBatches(
   files: DiffFile[],
   fileContents: Map<string, string>,
   tokenBudget: TokenBudget,
-  maxBatches: number
+  maxBatches: number,
 ): Batch[] {
   const prepared = prepareFiles(files, fileContents, tokenBudget);
   const batches = binPackFiles(prepared, tokenBudget, maxBatches);

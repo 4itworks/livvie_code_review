@@ -91,7 +91,7 @@ function parseNumberedLines(content: string): Map<number, string> {
 export function truncateToWindow(
   content: string,
   patch: string,
-  windowLines: number
+  windowLines: number,
 ): { content: string; truncated: boolean } {
   if (!content || !patch) {
     return { content, truncated: false };
@@ -162,7 +162,7 @@ export function truncateToWindow(
 export function progressiveTruncate(
   content: string,
   patch: string,
-  maxTokens: number
+  maxTokens: number,
 ): {
   content: string;
   truncated: boolean;

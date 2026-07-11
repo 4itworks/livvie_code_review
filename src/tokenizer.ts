@@ -17,7 +17,7 @@ export function calculateTokenBudget(
   maxOutput: number,
   systemPromptTokens: number,
   reviewInstructionsTokens: number,
-  crossFileHunksTokens: number
+  crossFileHunksTokens: number,
 ): TokenBudget {
   const safetyMargin = 500;
   const fileBudget =
@@ -33,7 +33,7 @@ export function calculateTokenBudget(
       `Token budget insufficient: contextWindow=${contextWindow}, maxOutput=${maxOutput}, ` +
         `systemPrompt=${systemPromptTokens}, reviewInstructions=${reviewInstructionsTokens}, ` +
         `crossFileHunks=${crossFileHunksTokens}, safetyMargin=${safetyMargin} ` +
-        `→ fileBudget=${fileBudget}. Reduce input sizes or increase context-window.`
+        `→ fileBudget=${fileBudget}. Reduce input sizes or increase context-window.`,
     );
   }
 

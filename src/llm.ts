@@ -11,7 +11,9 @@ export function parseReview(content: string, perspectiveId: string): StructuredR
   const jsonText = extractJson(content);
 
   if (!jsonText) {
-    core.warning(`Could not extract JSON from LLM response (${content.length} chars). Attempting repair...`);
+    core.warning(
+      `Could not extract JSON from LLM response (${content.length} chars). Attempting repair...`,
+    );
     const repaired = attemptJsonRepair(content);
     if (repaired) {
       core.info("Successfully repaired JSON from raw text response.");
@@ -19,7 +21,9 @@ export function parseReview(content: string, perspectiveId: string): StructuredR
         const parsed = JSON.parse(repaired) as LLMResponse;
         return {
           summary: parsed.summary || content.slice(0, 200),
-          findings: (parsed.findings || []).map((f: any) => normalizeFinding(f, perspectiveId)).filter(isValidFinding),
+          findings: (parsed.findings || [])
+            .map((f: any) => normalizeFinding(f, perspectiveId))
+            .filter(isValidFinding),
         };
       } catch (error) {
         core.warning(`Repaired JSON parse failed: ${error}`);
@@ -32,7 +36,9 @@ export function parseReview(content: string, perspectiveId: string): StructuredR
     const parsed = JSON.parse(jsonText) as LLMResponse;
     return {
       summary: parsed.summary || "",
-      findings: (parsed.findings || []).map((f: any) => normalizeFinding(f, perspectiveId)).filter(isValidFinding),
+      findings: (parsed.findings || [])
+        .map((f: any) => normalizeFinding(f, perspectiveId))
+        .filter(isValidFinding),
     };
   } catch (error) {
     core.warning(`Failed to parse JSON review: ${error}`);
@@ -41,10 +47,7 @@ export function parseReview(content: string, perspectiveId: string): StructuredR
 }
 
 function attemptJsonRepair(content: string): string | null {
-  const patterns = [
-    /```(?:json)?\s*(\{[\s\S]*?\})\s*```/i,
-    /(\{[\s\S]*\})/,
-  ];
+  const patterns = [/```(?:json)?\s*(\{[\s\S]*?\})\s*```/i, /(\{[\s\S]*\})/];
 
   for (const pattern of patterns) {
     const match = content.match(pattern);
@@ -107,25 +110,31 @@ function extractJson(content: string): string | null {
   return content.slice(start, end + 1).trim();
 }
 
-export function normalizeFinding(raw: Record<string, unknown>, perspectiveId: string): ReviewFinding {
+export function normalizeFinding(
+  raw: Record<string, unknown>,
+  perspectiveId: string,
+): ReviewFinding {
   const hasSuggestion = raw.suggestion && String(raw.suggestion).trim().length > 0;
   const line = Number(raw.line) || 0;
   const suggestionStartLine = Number(raw.suggestion_start_line) || null;
 
   const normalized: ReviewFinding = {
-    severity: raw.severity === "high" || raw.severity === "medium" || raw.severity === "low"
-      ? raw.severity
-      : "low",
-    confidence: raw.confidence === "high" || raw.confidence === "medium" || raw.confidence === "low"
-      ? raw.confidence
-      : "medium",
+    severity:
+      raw.severity === "high" || raw.severity === "medium" || raw.severity === "low"
+        ? raw.severity
+        : "low",
+    confidence:
+      raw.confidence === "high" || raw.confidence === "medium" || raw.confidence === "low"
+        ? raw.confidence
+        : "medium",
     file: String(raw.file || "").trim(),
     line,
     description: String(raw.description || "").trim(),
     suggestion: hasSuggestion ? String(raw.suggestion).trim() : null,
-    suggestionStartLine: hasSuggestion && suggestionStartLine && suggestionStartLine > 0 && suggestionStartLine < line
-      ? suggestionStartLine
-      : null,
+    suggestionStartLine:
+      hasSuggestion && suggestionStartLine && suggestionStartLine > 0 && suggestionStartLine < line
+        ? suggestionStartLine
+        : null,
     perspective: perspectiveId,
     foundBy: [perspectiveId],
   };

@@ -1,11 +1,6 @@
 import { Octokit } from "@octokit/rest";
 import * as core from "@actions/core";
-import type {
-  PipelineConfig,
-  Batch,
-  Perspective,
-  ReviewMatrixResult,
-} from "./types.js";
+import type { PipelineConfig, Batch, Perspective, ReviewMatrixResult } from "./types.js";
 import { fetchDiff, fetchFileContentsParallel } from "./diff.js";
 import { filterIgnoredFiles } from "./ignore-patterns.js";
 import { countTokens, calculateTokenBudget } from "./tokenizer.js";
@@ -17,7 +12,9 @@ import { reviewBatchFromPerspective, type LLMCallConfig } from "./llm-batch.js";
 import { consolidateReviews } from "./consolidation.js";
 import { postReview } from "./post.js";
 
-export async function runPipeline(config: PipelineConfig): Promise<{ reviewId: number; findingCount: number }> {
+export async function runPipeline(
+  config: PipelineConfig,
+): Promise<{ reviewId: number; findingCount: number }> {
   const octokit = new Octokit({ auth: config.githubToken });
 
   core.startGroup("Stage 1: Fetch");
@@ -26,7 +23,7 @@ export async function runPipeline(config: PipelineConfig): Promise<{ reviewId: n
     config.owner,
     config.repo,
     config.pullNumber,
-    config.maxDiffSize
+    config.maxDiffSize,
   );
   if (allFiles.length === 0) {
     core.info("No files with diffs");
@@ -36,7 +33,9 @@ export async function runPipeline(config: PipelineConfig): Promise<{ reviewId: n
 
   const { kept: files, ignored } = filterIgnoredFiles(allFiles, config.ignorePatterns);
   if (ignored.length > 0) {
-    core.info(`Ignored ${ignored.length} generated files: ${ignored.map((f) => f.filename).join(", ")}`);
+    core.info(
+      `Ignored ${ignored.length} generated files: ${ignored.map((f) => f.filename).join(", ")}`,
+    );
   }
   if (files.length === 0) {
     core.info("All files ignored");
@@ -44,23 +43,23 @@ export async function runPipeline(config: PipelineConfig): Promise<{ reviewId: n
     return { reviewId: 0, findingCount: 0 };
   }
 
-  core.info(`Fetching contents for ${files.length} files (concurrency ${config.fetchConcurrency})...`);
+  core.info(
+    `Fetching contents for ${files.length} files (concurrency ${config.fetchConcurrency})...`,
+  );
   const fileContents = await fetchFileContentsParallel(
     octokit,
     config.owner,
     config.repo,
     config.prHeadRef,
     files,
-    config.fetchConcurrency
+    config.fetchConcurrency,
   );
   core.info(`Fetched ${fileContents.size}/${files.length} file contents`);
   core.endGroup();
 
   core.startGroup("Stage 2: Batching");
   const perspectives = getPerspectives(config.perspectives);
-  const maxSystemPromptTokens = Math.max(
-    ...perspectives.map((p) => countTokens(p.systemPrompt))
-  );
+  const maxSystemPromptTokens = Math.max(...perspectives.map((p) => countTokens(p.systemPrompt)));
   const reviewInstructionsTokens = countTokens(config.reviewInstructions);
   const crossFileHunksTokens = Math.min(2000, Math.floor(config.contextWindow * 0.05));
   const tokenBudget = calculateTokenBudget(
@@ -68,7 +67,7 @@ export async function runPipeline(config: PipelineConfig): Promise<{ reviewId: n
     config.maxOutputTokens,
     maxSystemPromptTokens,
     reviewInstructionsTokens,
-    crossFileHunksTokens
+    crossFileHunksTokens,
   );
   const batches = createBatches(files, fileContents, tokenBudget, config.maxBatches);
   core.info(`Created ${batches.length} batches for ${files.length} files`);
@@ -100,7 +99,7 @@ export async function runPipeline(config: PipelineConfig): Promise<{ reviewId: n
     }
   }
   core.info(
-    `Matrix: ${batches.length} batches × ${perspectives.length} perspectives = ${matrixCalls.length} LLM calls`
+    `Matrix: ${batches.length} batches × ${perspectives.length} perspectives = ${matrixCalls.length} LLM calls`,
   );
 
   const results = await mapWithConcurrency(
@@ -109,12 +108,12 @@ export async function runPipeline(config: PipelineConfig): Promise<{ reviewId: n
       core.info(`  Reviewing batch ${batch.index} as ${perspective.name}...`);
       return reviewBatchFromPerspective(batch, perspective, llmConfig);
     },
-    config.llmConcurrency
+    config.llmConcurrency,
   );
 
-  const failedBatches = Array.from(new Set(
-    results.filter((r) => r.error && !r.review.findings.length).map((r) => r.batchIndex)
-  ));
+  const failedBatches = Array.from(
+    new Set(results.filter((r) => r.error && !r.review.findings.length).map((r) => r.batchIndex)),
+  );
   const unreviewedFiles = batches
     .filter((b) => failedBatches.includes(b.index))
     .flatMap((b) => b.files.map((f) => f.filename));
@@ -128,14 +127,14 @@ export async function runPipeline(config: PipelineConfig): Promise<{ reviewId: n
     successfulCalls: results.filter((r) => !r.error).length,
   };
   core.info(
-    `Review complete: ${matrixResult.successfulCalls}/${matrixResult.totalCalls} calls succeeded, ${matrixResult.rawFindings.length} raw findings`
+    `Review complete: ${matrixResult.successfulCalls}/${matrixResult.totalCalls} calls succeeded, ${matrixResult.rawFindings.length} raw findings`,
   );
   core.endGroup();
 
   core.startGroup("Stage 4: Consolidation");
   const consolidated = consolidateReviews(matrixResult, perspectives);
   core.info(
-    `Consolidated: ${consolidated.findings.length} findings (after dedup), ${consolidated.stats.high} high, ${consolidated.stats.medium} medium, ${consolidated.stats.low} low`
+    `Consolidated: ${consolidated.findings.length} findings (after dedup), ${consolidated.stats.high} high, ${consolidated.stats.medium} medium, ${consolidated.stats.low} low`,
   );
   if (consolidated.unreviewedFiles.length > 0) {
     core.warning(`Unreviewed files: ${consolidated.unreviewedFiles.join(", ")}`);
@@ -151,7 +150,7 @@ export async function runPipeline(config: PipelineConfig): Promise<{ reviewId: n
     consolidated,
     files,
     config.requestChangesOnHigh,
-    config.maxComments
+    config.maxComments,
   );
   core.endGroup();
 

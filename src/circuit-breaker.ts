@@ -47,7 +47,7 @@ export function createCircuitBreaker(threshold?: number): {
 export function calculateBackoff(
   attempt: number,
   baseDelayMs?: number,
-  maxDelayMs?: number
+  maxDelayMs?: number,
 ): number {
   const base = baseDelayMs ?? 1000;
   const max = maxDelayMs ?? 30000;
