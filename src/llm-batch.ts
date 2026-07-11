@@ -252,15 +252,15 @@ export async function callLLMWithRetry(
         throw new Error(`LLM API error ${response.status}: ${sanitizedError}`);
       }
 
-      const responseText = await response.text();
+      const responseText = (await response.text()).trim();
 
       let data: LLMResponseData | undefined;
       try {
         data = JSON.parse(responseText);
       } catch {
         throw new Error(
-          `LLM returned truncated or invalid JSON response (${responseText.length} chars). ` +
-            `Preview: ${responseText.slice(0, 200)}...`,
+          `LLM returned invalid JSON response (${responseText.length} chars). ` +
+            `Preview: ${responseText.slice(0, 200)}`,
         );
       }
 
@@ -294,6 +294,17 @@ export async function callLLMWithRetry(
       return { content, modelUsed: model };
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
+      const isRetryable =
+        lastError.message.includes("LLM API error") ||
+        lastError.message.includes("aborted") ||
+        lastError.message.includes("fetch failed") ||
+        lastError.message.includes("ETIMEDOUT") ||
+        lastError.message.includes("ECONNRESET");
+
+      if (!isRetryable) {
+        core.warning(`Batch model returned non-retryable error: ${lastError.message}`);
+        break;
+      }
 
       if (attempt < maxRetries) {
         const delay = calculateBackoff(attempt);

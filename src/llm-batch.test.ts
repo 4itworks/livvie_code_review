@@ -324,6 +324,56 @@ describe("reviewBatchFromPerspective", () => {
     expect(requestBody.model).toBe("fallback-model");
   });
 
+  it("does not retry on invalid JSON response (non-retryable)", async () => {
+    const whitespaceResponse = {
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      text: () => Promise.resolve("   \n\n   "),
+    } as unknown as Response;
+
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce(whitespaceResponse)
+      .mockResolvedValueOnce(whitespaceResponse);
+    globalThis.fetch = mockFetch;
+
+    const batch = makeBatch(0, ["lib/main.dart"]);
+    const perspective = makePerspective("generalist");
+    const config = makeLLMConfig({ maxRetries: 3 });
+
+    const result = await reviewBatchFromPerspective(batch, perspective, config);
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(result.error).toBeDefined();
+    expect(result.error).toContain("Primary model:");
+    expect(result.error).toContain("Fallback model:");
+  });
+
+  it("retries on API error (retryable)", async () => {
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce(makeErrorResponse(500, "Server error"))
+      .mockResolvedValueOnce(makeErrorResponse(500, "Server error"))
+      .mockResolvedValueOnce(makeSuccessResponse(validReviewJson));
+    globalThis.fetch = mockFetch;
+
+    vi.mocked(parseReview).mockReturnValue({
+      summary: "OK",
+      findings: [],
+    });
+
+    const batch = makeBatch(0, ["lib/main.dart"]);
+    const perspective = makePerspective("generalist");
+    const config = makeLLMConfig({ maxRetries: 3 });
+
+    const result = await reviewBatchFromPerspective(batch, perspective, config);
+
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(result.error).toBeUndefined();
+    expect(result.modelUsed).toBe("primary-model");
+  });
+
   it("includes reasoning config when reasoningEffort is not none", async () => {
     const mockFetch = vi.fn().mockResolvedValue(makeSuccessResponse(validReviewJson));
     globalThis.fetch = mockFetch;
