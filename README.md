@@ -31,7 +31,6 @@
 - [Supported Providers](#supported-providers)
 - [Migrating from v1](#migrating-from-v1)
 - [Development](#development)
-- [Branch Protection](#branch-protection)
 - [License](#license)
 
 ## Why
@@ -470,18 +469,6 @@ npm run format && npm run typecheck && npm test && npm run build
 ```
 
 CI runs `lint`, `typecheck`, `test`, and `build-check` in parallel — all must pass before merge.
-
-## Branch Protection
-
-To require CI checks before merging PRs, enable branch protection on `main`:
-
-1. Go to **Settings → Branches → Add rule**
-2. Set **Branch name pattern** to `main`
-3. Enable **Require status checks to pass before merging**
-4. Select these required checks: `format`, `lint`, `typecheck`, `test`, `build-check`
-5. Enable **Require branches to be up to date before merging**
-
-This ensures every PR passes formatting, typecheck, tests, and build verification before merge.
 
 ## License
 
