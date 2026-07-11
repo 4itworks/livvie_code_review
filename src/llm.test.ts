@@ -289,11 +289,11 @@ describe("isValidFinding", () => {
     expect(isValidFinding(make({}))).toBe(true);
   });
 
-  it('empty perspective → false', () => {
+  it("empty perspective → false", () => {
     expect(isValidFinding(make({ perspective: "" }))).toBe(false);
   });
 
-  it('empty foundBy → false', () => {
+  it("empty foundBy → false", () => {
     expect(isValidFinding(make({ foundBy: [] }))).toBe(false);
   });
 

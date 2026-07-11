@@ -78,13 +78,7 @@ export async function runPipeline(
     config.safetyMargin,
     files.length,
   );
-  const batches = createBatches(
-    files,
-    fileContents,
-    tokenBudget,
-    config.maxBatches,
-    failedFiles,
-  );
+  const batches = createBatches(files, fileContents, tokenBudget, config.maxBatches, failedFiles);
   core.info(`Created ${batches.length} batches for ${files.length} files`);
   for (const batch of batches) {
     core.info(
