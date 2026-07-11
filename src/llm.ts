@@ -2,111 +2,292 @@ import * as core from "@actions/core";
 import type { StructuredReview, ReviewFinding } from "./types.js";
 import { validateSuggestion } from "./suggestion.js";
 
-export function parseReview(content: string, perspectiveId: string): StructuredReview {
-  const jsonText = extractJson(content);
+const VALID_SEVERITIES = new Set<"high" | "medium" | "low">(["high", "medium", "low"]);
+const VALID_CONFIDENCES = new Set<"high" | "medium" | "low">(["high", "medium", "low"]);
 
-  if (!jsonText) {
+export function parseReview(content: string, perspectiveId: string): StructuredReview {
+  const trimmed = content.trim();
+  if (!trimmed) {
+    return { summary: "", findings: [] };
+  }
+
+  let parsed: unknown | undefined;
+  let parseError: unknown;
+
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch (error) {
+    parseError = error;
+  }
+
+  if (parsed === undefined) {
+    const extracted = extractJson(trimmed);
+    if (extracted) {
+      try {
+        parsed = JSON.parse(extracted);
+      } catch (error) {
+        parseError = error;
+      }
+    }
+  }
+
+  if (parsed === undefined) {
     core.warning(
-      `Could not extract JSON from LLM response (${content.length} chars). Attempting repair...`,
+      `Could not parse JSON from LLM response (${content.length} chars). Attempting repair...`,
     );
-    const repaired = attemptJsonRepair(content);
+    const repaired = attemptJsonRepair(trimmed);
     if (repaired) {
       core.info("Successfully repaired JSON from raw text response.");
       try {
-        const parsed: unknown = JSON.parse(repaired);
-        const obj = parsed as Record<string, unknown>;
-        const findings = Array.isArray(obj.findings) ? obj.findings : [];
-        return {
-          summary: typeof obj.summary === "string" ? obj.summary : content.slice(0, 200),
-          findings: findings
-            .map((f) => normalizeFinding(f as Record<string, unknown>, perspectiveId))
-            .filter(isValidFinding),
-        };
+        parsed = JSON.parse(repaired);
       } catch (error) {
+        parseError = error;
         core.warning(`Repaired JSON parse failed: ${error}`);
       }
     }
+  }
+
+  if (parsed === undefined) {
+    core.warning(`Failed to parse JSON review: ${parseError}`);
     return { summary: content.slice(0, 500), findings: [] };
   }
 
-  try {
-    const parsed: unknown = JSON.parse(jsonText);
-    const obj = parsed as Record<string, unknown>;
-    const findings = Array.isArray(obj.findings) ? obj.findings : [];
-    return {
-      summary: typeof obj.summary === "string" ? obj.summary : "",
-      findings: findings
-        .map((f) => normalizeFinding(f as Record<string, unknown>, perspectiveId))
-        .filter(isValidFinding),
-    };
-  } catch (error) {
-    core.warning(`Failed to parse JSON review: ${error}`);
-    return { summary: content.slice(0, 500), findings: [] };
-  }
+  const obj = parsed as Record<string, unknown>;
+  const findings = Array.isArray(obj.findings) ? obj.findings : [];
+  return {
+    summary: typeof obj.summary === "string" ? obj.summary : "",
+    findings: findings
+      .map((f) => normalizeFinding(f as Record<string, unknown>, perspectiveId))
+      .filter(isValidFinding),
+  };
 }
 
 function attemptJsonRepair(content: string): string | null {
-  const patterns = [/```(?:json)?\s*(\{[\s\S]*?\})\s*```/i, /(\{[\s\S]*\})/];
+  const fenced = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (fenced) {
+    const candidate = repairJsonFragment(fenced[1].trim());
+    if (candidate) return candidate;
+  }
 
-  for (const pattern of patterns) {
-    const match = content.match(pattern);
-    if (match) {
-      let candidate = match[1].trim();
-      candidate = fixTrailingCommas(candidate);
-      candidate = fixUnclosedBraces(candidate);
-      try {
-        JSON.parse(candidate);
-        return candidate;
-      } catch {
-        continue;
-      }
-    }
+  const balanced = extractBalancedJson(content);
+  if (balanced) {
+    const candidate = repairJsonFragment(balanced);
+    if (candidate) return candidate;
   }
 
   const start = content.indexOf("{");
   const end = content.lastIndexOf("}");
   if (start !== -1 && end > start) {
-    let candidate2 = content.slice(start, end + 1).trim();
-    candidate2 = fixTrailingCommas(candidate2);
-    candidate2 = fixUnclosedBraces(candidate2);
+    const candidate = repairJsonFragment(content.slice(start, end + 1).trim());
+    if (candidate) return candidate;
+  }
+
+  return null;
+}
+
+function repairJsonFragment(fragment: string): string | null {
+  const trimmed = fragment.trim();
+  if (!trimmed) return null;
+
+  let candidate = fixTrailingCommas(trimmed);
+  candidate = fixUnclosedBraces(candidate);
+  try {
+    JSON.parse(candidate);
+    return candidate;
+  } catch {
+    return null;
+  }
+}
+
+function fixTrailingCommas(json: string): string {
+  const result: string[] = [];
+  let i = 0;
+  const len = json.length;
+
+  while (i < len) {
+    const state = getStringState(json, i);
+    if (state.inString || state.inBlockComment || state.inLineComment) {
+      result.push(json[i]);
+      i++;
+      continue;
+    }
+
+    if (json[i] === ",") {
+      const nextNonSpace = findNextNonSpace(json, i + 1);
+      if (nextNonSpace !== -1 && (json[nextNonSpace] === "}" || json[nextNonSpace] === "]")) {
+        i++;
+        continue;
+      }
+    }
+
+    result.push(json[i]);
+    i++;
+  }
+
+  return result.join("");
+}
+
+function fixUnclosedBraces(json: string): string {
+  let opens = 0;
+  let brackets = 0;
+  let i = 0;
+  const len = json.length;
+
+  while (i < len) {
+    const state = getStringState(json, i);
+    if (state.inString || state.inBlockComment || state.inLineComment) {
+      i = state.endIndex;
+      continue;
+    }
+
+    if (json[i] === "{") opens++;
+    else if (json[i] === "}") opens--;
+    else if (json[i] === "[") brackets++;
+    else if (json[i] === "]") brackets--;
+    i++;
+  }
+
+  let fixed = json;
+  if (opens > 0) fixed += "}".repeat(opens);
+  if (brackets > 0) fixed += "]".repeat(brackets);
+  return fixed;
+}
+
+function extractJson(content: string): string | null {
+  const trimmed = content.trim();
+
+  try {
+    JSON.parse(trimmed);
+    return trimmed;
+  } catch {
+    // fall through to extraction
+  }
+
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (fenced) {
+    const candidate = fenced[1].trim();
     try {
-      JSON.parse(candidate2);
-      return candidate2;
+      JSON.parse(candidate);
+      return candidate;
     } catch {
-      return null;
+      // fall through
+    }
+  }
+
+  const balanced = extractBalancedJson(trimmed);
+  if (balanced) {
+    try {
+      JSON.parse(balanced);
+      return balanced;
+    } catch {
+      // fall through
     }
   }
 
   return null;
 }
 
-function fixTrailingCommas(json: string): string {
-  return json.replace(/,\s*([}\]])/g, "$1");
+function extractBalancedJson(content: string): string | null {
+  let i = 0;
+  const len = content.length;
+
+  while (i < len) {
+    if (content[i] === "{") {
+      let depth = 0;
+      let j = i;
+      while (j < len) {
+        const state = getStringState(content, j);
+        if (state.inString || state.inBlockComment || state.inLineComment) {
+          j = state.endIndex;
+          continue;
+        }
+
+        if (content[j] === "{") depth++;
+        else if (content[j] === "}") depth--;
+
+        if (depth === 0) {
+          return content.slice(i, j + 1);
+        }
+        j++;
+      }
+    }
+    i++;
+  }
+
+  return null;
 }
 
-function fixUnclosedBraces(json: string): string {
-  const opens = (json.match(/{/g) || []).length;
-  const closes = (json.match(/}/g) || []).length;
-  if (opens > closes) {
-    json += "}".repeat(opens - closes);
-  }
-  const openBrackets = (json.match(/\[/g) || []).length;
-  const closeBrackets = (json.match(/]/g) || []).length;
-  if (openBrackets > closeBrackets) {
-    json += "]".repeat(openBrackets - closeBrackets);
-  }
-  return json;
+interface StringState {
+  inString: boolean;
+  inBlockComment: boolean;
+  inLineComment: boolean;
+  endIndex: number;
 }
 
-function extractJson(content: string): string | null {
-  const fenced = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-  if (fenced) return fenced[1].trim();
+function getStringState(text: string, startIndex: number): StringState {
+  let i = 0;
+  const len = text.length;
 
-  const start = content.indexOf("{");
-  const end = content.lastIndexOf("}");
-  if (start === -1 || end === -1 || end <= start) return null;
+  while (i < len) {
+    if (i >= startIndex) {
+      return {
+        inString: false,
+        inBlockComment: false,
+        inLineComment: false,
+        endIndex: i + 1,
+      };
+    }
 
-  return content.slice(start, end + 1).trim();
+    if (text[i] === "\\") {
+      i += 2;
+      continue;
+    }
+
+    if (text[i] === '"' || text[i] === "'" || text[i] === "`") {
+      const quote = text[i];
+      i++;
+      while (i < len) {
+        if (text[i] === "\\") {
+          i += 2;
+          continue;
+        }
+        if (text[i] === quote) {
+          i++;
+          break;
+        }
+        i++;
+      }
+      continue;
+    }
+
+    if (text[i] === "/" && text[i + 1] === "/") {
+      while (i < len && text[i] !== "\n") i++;
+      continue;
+    }
+
+    if (text[i] === "/" && text[i + 1] === "*") {
+      i += 2;
+      while (i < len && !(text[i] === "*" && text[i + 1] === "/")) i++;
+      i += 2;
+      continue;
+    }
+
+    i++;
+  }
+
+  return {
+    inString: false,
+    inBlockComment: false,
+    inLineComment: false,
+    endIndex: len,
+  };
+}
+
+function findNextNonSpace(text: string, startIndex: number): number {
+  for (let i = startIndex; i < text.length; i++) {
+    if (!/\s/.test(text[i])) return i;
+  }
+  return -1;
 }
 
 export function normalizeFinding(
@@ -114,26 +295,33 @@ export function normalizeFinding(
   perspectiveId: string,
 ): ReviewFinding {
   const hasSuggestion = raw.suggestion && String(raw.suggestion).trim().length > 0;
-  const line = Number(raw.line) || 0;
-  const suggestionStartLine = Number(raw.suggestion_start_line) || null;
+  const lineValue = Number(raw.line);
+  const line = Number.isFinite(lineValue) && lineValue > 0 ? lineValue : 0;
+  const suggestionStartLineRaw = Number(raw.suggestion_start_line);
+  const suggestionStartLine =
+    hasSuggestion &&
+    Number.isFinite(suggestionStartLineRaw) &&
+    suggestionStartLineRaw > 0 &&
+    suggestionStartLineRaw < line
+      ? suggestionStartLineRaw
+      : null;
+
+  const severity = VALID_SEVERITIES.has(raw.severity as "high" | "medium" | "low")
+    ? (raw.severity as "high" | "medium" | "low")
+    : "low";
+
+  const confidence = VALID_CONFIDENCES.has(raw.confidence as "high" | "medium" | "low")
+    ? (raw.confidence as "high" | "medium" | "low")
+    : "medium";
 
   const normalized: ReviewFinding = {
-    severity:
-      raw.severity === "high" || raw.severity === "medium" || raw.severity === "low"
-        ? raw.severity
-        : "low",
-    confidence:
-      raw.confidence === "high" || raw.confidence === "medium" || raw.confidence === "low"
-        ? raw.confidence
-        : "medium",
+    severity,
+    confidence,
     file: String(raw.file || "").trim(),
     line,
     description: String(raw.description || "").trim(),
     suggestion: hasSuggestion ? String(raw.suggestion).trim() : null,
-    suggestionStartLine:
-      hasSuggestion && suggestionStartLine && suggestionStartLine > 0 && suggestionStartLine < line
-        ? suggestionStartLine
-        : null,
+    suggestionStartLine,
     perspective: perspectiveId,
     foundBy: [perspectiveId],
   };
@@ -142,5 +330,11 @@ export function normalizeFinding(
 }
 
 export function isValidFinding(f: ReviewFinding): boolean {
-  return f.file.length > 0 && f.line > 0 && f.description.length > 0;
+  return (
+    f.file.length > 0 &&
+    f.line > 0 &&
+    f.description.length > 0 &&
+    f.perspective.length > 0 &&
+    f.foundBy.length > 0
+  );
 }

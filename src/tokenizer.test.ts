@@ -38,27 +38,27 @@ describe("countTokens", () => {
 // ---------------------------------------------------------------------------
 describe("calculateTokenBudget", () => {
   it("normal values → correct fileBudget calculation", () => {
-    const budget = calculateTokenBudget(128000, 4096, 2000, 1000, 500);
-    // fileBudget = 128000 - 4096 - 2000 - 1000 - 500 - 500 = 119904
+    const budget = calculateTokenBudget(128000, 4096, 2000, 1000, 500, 1000, 0);
+    // fileBudget = 128000 - 4096 - 2000 - 1000 - 500 - 1000 - 0 = 119404
     expect(budget.contextWindow).toBe(128000);
     expect(budget.maxOutput).toBe(4096);
     expect(budget.systemPromptTokens).toBe(2000);
     expect(budget.reviewInstructionsTokens).toBe(1000);
     expect(budget.crossFileHunksTokens).toBe(500);
-    expect(budget.safetyMargin).toBe(500);
-    expect(budget.fileBudget).toBe(119904);
+    expect(budget.safetyMargin).toBe(1000);
+    expect(budget.fileBudget).toBe(119404);
   });
 
   it("insufficient budget (negative fileBudget) → throws Error", () => {
-    expect(() => calculateTokenBudget(1000, 4096, 2000, 1000, 500)).toThrow(Error);
+    expect(() => calculateTokenBudget(1000, 4096, 2000, 1000, 500, 1000, 0)).toThrow(Error);
   });
 
   it("zero context window → throws", () => {
-    expect(() => calculateTokenBudget(0, 4096, 2000, 1000, 500)).toThrow(Error);
+    expect(() => calculateTokenBudget(0, 4096, 2000, 1000, 500, 1000, 0)).toThrow(Error);
   });
 
   it("large context window → large fileBudget", () => {
-    const budget = calculateTokenBudget(1_000_000, 4096, 2000, 1000, 500);
+    const budget = calculateTokenBudget(1_000_000, 4096, 2000, 1000, 500, 1000, 0);
     expect(budget.fileBudget).toBeGreaterThan(900_000);
   });
 });

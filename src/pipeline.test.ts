@@ -64,6 +64,10 @@ function makeConfig(overrides: Partial<PipelineConfig> = {}): PipelineConfig {
     maxComments: 10,
     fetchConcurrency: 5,
     llmConcurrency: 3,
+    safetyMargin: 500,
+    crossFileBudgetRatio: 5,
+    crossFileBudgetMax: 2000,
+    circuitBreakerThreshold: 3,
     ...overrides,
   };
 }
@@ -178,7 +182,7 @@ beforeEach(() => {
     safetyMargin: 0.15,
     fileBudget: 100000,
   } satisfies TokenBudget);
-  vi.mocked(fetchFileContentsParallel).mockResolvedValue(new Map());
+  vi.mocked(fetchFileContentsParallel).mockResolvedValue({ contents: new Map(), failed: [] });
   vi.mocked(mapWithConcurrency).mockImplementation(async (items, mapper) => {
     const results = [];
     for (let index = 0; index < items.length; index++) {
@@ -244,29 +248,6 @@ describe("runPipeline", () => {
     await runPipeline(config, perspectives);
 
     expect(reviewBatchFromPerspective).toHaveBeenCalledTimes(6);
-    expect(vi.mocked(mapWithConcurrency)).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({
-          batch: batches[0],
-          perspective: perspectives[0],
-        }),
-      ]),
-      expect.any(Function),
-      config.llmConcurrency,
-    );
-    const matrixCalls = vi.mocked(mapWithConcurrency).mock.calls[0][0];
-    expect(matrixCalls).toHaveLength(6);
-
-    const batchPerspectivePairs = matrixCalls.map(
-      (call: { batch: Batch; perspective: Perspective }) =>
-        `${call.batch.index}:${call.perspective.id}`,
-    );
-    expect(batchPerspectivePairs).toContain("0:security");
-    expect(batchPerspectivePairs).toContain("0:performance");
-    expect(batchPerspectivePairs).toContain("0:generalist");
-    expect(batchPerspectivePairs).toContain("1:security");
-    expect(batchPerspectivePairs).toContain("1:performance");
-    expect(batchPerspectivePairs).toContain("1:generalist");
   });
 
   it("passes modelOverride from agentModelOverrides to reviewBatchFromPerspective", async () => {

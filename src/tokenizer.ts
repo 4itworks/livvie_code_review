@@ -18,22 +18,26 @@ export function calculateTokenBudget(
   systemPromptTokens: number,
   reviewInstructionsTokens: number,
   crossFileHunksTokens: number,
+  safetyMargin: number,
+  fileCount: number,
 ): TokenBudget {
-  const safetyMargin = 500;
+  const totalOverhead = fileCount * PER_FILE_OVERHEAD_TOKENS;
   const fileBudget =
     contextWindow -
     maxOutput -
     systemPromptTokens -
     reviewInstructionsTokens -
     crossFileHunksTokens -
-    safetyMargin;
+    safetyMargin -
+    totalOverhead;
 
   if (fileBudget <= 0) {
     throw new Error(
       `Token budget insufficient: contextWindow=${contextWindow}, maxOutput=${maxOutput}, ` +
         `systemPrompt=${systemPromptTokens}, reviewInstructions=${reviewInstructionsTokens}, ` +
-        `crossFileHunks=${crossFileHunksTokens}, safetyMargin=${safetyMargin} ` +
-        `→ fileBudget=${fileBudget}. Reduce input sizes or increase context-window.`,
+        `crossFileHunks=${crossFileHunksTokens}, safetyMargin=${safetyMargin}, ` +
+        `fileOverhead=${totalOverhead} → fileBudget=${fileBudget}. ` +
+        `Reduce input sizes or increase context-window.`,
     );
   }
 

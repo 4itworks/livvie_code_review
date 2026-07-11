@@ -51,6 +51,17 @@ describe("buildCrossFileContext", () => {
     expect(result.length).toBeLessThan(5000);
   });
 
+  it("truncates oversized sections and marks context as truncated", () => {
+    const hugePatch =
+      "@@ -1,1 +1,10001 @@\n" +
+      Array.from({ length: 10000 }, (_, i) => `+line number ${i} with varied content ${i % 100}`).join("\n");
+    const batch0 = makeBatch(0, [makePreparedFile("lib/huge.dart", hugePatch)]);
+    const batch1 = makeBatch(1, [makePreparedFile("lib/main.dart", "@@ -1,3 +1,4 @@\n+main")]);
+    const result = buildCrossFileContext([batch0, batch1], batch1, 1000);
+    expect(result).toContain("lib/huge.dart");
+    expect(result).toContain("(truncated)");
+  });
+
   it("empty patch → compact summary is empty", () => {
     const batch0 = makeBatch(0, [makePreparedFile("lib/empty.dart", "")]);
     const batch1 = makeBatch(1, [makePreparedFile("lib/main.dart", "@@ -1,3 +1,4 @@\n+main")]);

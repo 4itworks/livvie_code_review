@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 
-import { extractChangedLines, truncateToWindow, progressiveTruncate } from "./truncation.js";
+import {
+  extractChangedLines,
+  truncateToWindow,
+  progressiveTruncate,
+  truncateTextToBudget,
+} from "./truncation.js";
+import { countTokens } from "./tokenizer.js";
 
 // ---------------------------------------------------------------------------
 // extractChangedLines
@@ -145,6 +151,36 @@ describe("progressiveTruncate", () => {
     // Very tight budget to force truncation
     const result = progressiveTruncate(content, patch, 20);
     expect(result.truncated).toBe(true);
+    expect(countTokens(result.content)).toBeLessThanOrEqual(20);
     expect(["window-10", "window-5", "diff-only"]).toContain(result.strategy);
+  });
+
+  it("diff-only fallback is capped to the token budget", () => {
+    const content = makeNumberedContent(500);
+    const patch = "+" + "a".repeat(2000);
+    const result = progressiveTruncate(content, patch, 50);
+    expect(result.strategy).toBe("diff-only");
+    expect(countTokens(result.content)).toBeLessThanOrEqual(50);
+  });
+});
+
+describe("truncateTextToBudget", () => {
+  it("returns original text when it fits", () => {
+    const result = truncateTextToBudget("hello world", 100);
+    expect(result.content).toBe("hello world");
+    expect(result.truncated).toBe(false);
+  });
+
+  it("truncates text to fit the token budget", () => {
+    const text = "x".repeat(1000);
+    const result = truncateTextToBudget(text, 50);
+    expect(result.truncated).toBe(true);
+    expect(countTokens(result.content)).toBeLessThanOrEqual(50);
+  });
+
+  it("returns empty string for empty input", () => {
+    const result = truncateTextToBudget("", 10);
+    expect(result.content).toBe("");
+    expect(result.truncated).toBe(false);
   });
 });

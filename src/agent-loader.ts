@@ -5,6 +5,7 @@ import { SHARED_REVIEW_RULES } from "./shared-rules.js";
 
 const AGENT_COUNT_WARNING_THRESHOLD = 10;
 const MAX_TEMPERATURE = 2;
+const DEFAULT_TEMPERATURE = 0.1;
 
 export interface ParsedFrontmatter {
   frontmatter: Record<string, unknown>;
@@ -77,7 +78,7 @@ function parseAgentFile(file: AgentFile, seenNames: Set<string>): ParsedAgent {
   const stem = file.filename.replace(/\.md$/i, "").toLowerCase();
   const { frontmatter, body } = parseFrontmatter(file.content);
 
-  const name = (frontmatter.name as string) || stem;
+  const name = (frontmatter.name as string)?.trim() || stem;
   if (!name) {
     throw new Error(`Agent file "${file.filename}" has no name`);
   }
@@ -96,7 +97,7 @@ function parseAgentFile(file: AgentFile, seenNames: Set<string>): ParsedAgent {
 
   const systemPrompt = trimmedBody + "\n\n" + SHARED_REVIEW_RULES;
 
-  const focus = (frontmatter.focus as string) || "";
+  const focus = ((frontmatter.focus as string) || "").trim();
 
   let override: AgentModelOverrides | null = null;
   const hasModel = "model" in frontmatter;
@@ -104,11 +105,20 @@ function parseAgentFile(file: AgentFile, seenNames: Set<string>): ParsedAgent {
 
   if (hasModel || hasTemperature) {
     const model = hasModel ? (frontmatter.model as string | null) : null;
-    let temperature = hasTemperature ? (frontmatter.temperature as number) : 0;
+    let temperature = hasTemperature ? (frontmatter.temperature as number) : undefined;
 
-    temperature = Math.max(0, Math.min(MAX_TEMPERATURE, temperature));
+    if (temperature !== undefined) {
+      if (temperature < 0 || temperature > MAX_TEMPERATURE) {
+        core.warning(
+          `Agent "${name}" temperature ${temperature} out of range; clamped to [0, ${MAX_TEMPERATURE}]`,
+        );
+      }
+      temperature = Math.max(0, Math.min(MAX_TEMPERATURE, temperature));
+    }
 
-    override = { model: model ?? null, temperature };
+    if (model || temperature !== undefined) {
+      override = { model: model ?? null, temperature: temperature ?? DEFAULT_TEMPERATURE };
+    }
   }
 
   return {

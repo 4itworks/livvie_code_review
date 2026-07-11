@@ -110,7 +110,7 @@ describe("binPackFiles", () => {
     };
     const budget = makeBudget({ fileBudget: 10000 });
 
-    const batches = binPackFiles([file], budget, 0);
+    const batches = binPackFiles([file], budget, 0, []);
     expect(batches).toHaveLength(1);
     expect(batches[0].files).toHaveLength(1);
     expect(batches[0].tokenCount).toBe(100);
@@ -141,7 +141,7 @@ describe("binPackFiles", () => {
     ];
     const budget = makeBudget({ fileBudget: 10000 });
 
-    const batches = binPackFiles(files, budget, 0);
+    const batches = binPackFiles(files, budget, 0, []);
     expect(batches).toHaveLength(1);
     expect(batches[0].files).toHaveLength(2);
   });
@@ -171,14 +171,14 @@ describe("binPackFiles", () => {
     ];
     const budget = makeBudget({ fileBudget: 50000 });
 
-    const batches = binPackFiles(files, budget, 0);
+    const batches = binPackFiles(files, budget, 0, []);
     // Each file is 40k tokens, budget is 50k — they can't fit in the same batch
     expect(batches).toHaveLength(2);
     expect(batches[0].files).toHaveLength(1);
     expect(batches[1].files).toHaveLength(1);
   });
 
-  it("maxBatches=1 → all files in one batch (overflow)", () => {
+  it("maxBatches=1 → rejects files exceeding single-file budget as unreviewable", () => {
     const files: PreparedFile[] = [
       {
         filename: "src/a.dart",
@@ -202,12 +202,58 @@ describe("binPackFiles", () => {
       },
     ];
     const budget = makeBudget({ fileBudget: 50000 });
+    const unreviewable: string[] = [];
 
-    const batches = binPackFiles(files, budget, 1);
-    expect(batches).toHaveLength(1);
-    expect(batches[0].files).toHaveLength(2);
-    // 55000 + 55000 = 110000 > 50000 * 2 = 100000 → warning triggered
+    const batches = binPackFiles(files, budget, 1, unreviewable);
+    expect(batches).toHaveLength(0);
+    expect(unreviewable).toContain("src/a.dart");
+    expect(unreviewable).toContain("src/b.dart");
     expect(core.warning).toHaveBeenCalled();
+  });
+
+  it("does not corrupt directory affinity when first-fit fills a different batch", () => {
+    // Two files in the same directory that cannot share a batch.
+    // A third small file in a different directory should not steal the directory map.
+    const files: PreparedFile[] = [
+      {
+        filename: "lib/a.dart",
+        patch: "",
+        additions: 1,
+        deletions: 0,
+        content: "a",
+        tokenCount: 40000,
+        truncated: false,
+        directory: "lib",
+      },
+      {
+        filename: "test/x.dart",
+        patch: "",
+        additions: 1,
+        deletions: 0,
+        content: "x",
+        tokenCount: 100,
+        truncated: false,
+        directory: "test",
+      },
+      {
+        filename: "lib/b.dart",
+        patch: "",
+        additions: 1,
+        deletions: 0,
+        content: "b",
+        tokenCount: 40000,
+        truncated: false,
+        directory: "lib",
+      },
+    ];
+    const budget = makeBudget({ fileBudget: 50000 });
+
+    const batches = binPackFiles(files, budget, 0, []);
+    // lib/a.dart -> batch 0, test/x.dart fits in batch 0 by first-fit,
+    // lib/b.dart must NOT be forced into batch 0 because of corrupted directory map.
+    expect(batches).toHaveLength(2);
+    expect(batches[0].files.map((f) => f.filename)).toEqual(["lib/a.dart", "test/x.dart"]);
+    expect(batches[1].files.map((f) => f.filename)).toEqual(["lib/b.dart"]);
   });
 
   it("maxBatches=0 → unlimited batches", () => {
@@ -223,7 +269,7 @@ describe("binPackFiles", () => {
     }));
     const budget = makeBudget({ fileBudget: 50000 });
 
-    const batches = binPackFiles(files, budget, 0);
+    const batches = binPackFiles(files, budget, 0, []);
     // Each file is 45k, budget 50k, each needs its own batch
     expect(batches).toHaveLength(10);
   });
@@ -263,7 +309,7 @@ describe("binPackFiles", () => {
     ];
     const budget = makeBudget({ fileBudget: 10000 });
 
-    const batches = binPackFiles(files, budget, 0);
+    const batches = binPackFiles(files, budget, 0, []);
     // lib/a.dart goes into batch 0, test/b.dart can fit → batch 0,
     // lib/c.dart prefers batch 0 (same directory) → batch 0
     expect(batches).toHaveLength(1);

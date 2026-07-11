@@ -288,4 +288,32 @@ describe("isValidFinding", () => {
   it('file="a.ts", line=1, description="x" → true', () => {
     expect(isValidFinding(make({}))).toBe(true);
   });
+
+  it('empty perspective → false', () => {
+    expect(isValidFinding(make({ perspective: "" }))).toBe(false);
+  });
+
+  it('empty foundBy → false', () => {
+    expect(isValidFinding(make({ foundBy: [] }))).toBe(false);
+  });
+
+  it("direct JSON parse preferred over greedy extraction", () => {
+    const input = '{"summary": "ok", "findings": []} some trailing text';
+    const result = parseReview(input, "perf");
+    expect(result.summary).toBe("ok");
+  });
+
+  it("extracts balanced JSON embedded in text", () => {
+    const input = 'prefix {"summary": "embedded", "findings": []} suffix';
+    const result = parseReview(input, "perf");
+    expect(result.summary).toBe("embedded");
+  });
+
+  it("repairs trailing commas inside string literals safely", () => {
+    const input =
+      '{"summary": "x", "findings": [{"severity": "low", "confidence": "medium", "file": "a.ts", "line": 1, "description": "has comma, inside string", "suggestion": null}]}';
+    const result = parseReview(input, "perf");
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0].description).toBe("has comma, inside string");
+  });
 });

@@ -5,7 +5,7 @@ import { fetchDiff, fetchFileContentsParallel } from "./diff.js";
 import { filterIgnoredFiles } from "./ignore-patterns.js";
 import { countTokens, calculateTokenBudget } from "./tokenizer.js";
 import { createBatches } from "./batcher.js";
-import { createSemaphore, mapWithConcurrency } from "./concurrency.js";
+import { createSemaphore } from "./concurrency.js";
 import { createCircuitBreaker } from "./circuit-breaker.js";
 import { reviewBatchFromPerspective, type LLMCallConfig } from "./llm-batch.js";
 import { consolidateReviews } from "./consolidation.js";
@@ -46,7 +46,7 @@ export async function runPipeline(
   core.info(
     `Fetching contents for ${files.length} files (concurrency ${config.fetchConcurrency})...`,
   );
-  const fileContents = await fetchFileContentsParallel(
+  const fetchResult = await fetchFileContentsParallel(
     octokit,
     config.owner,
     config.repo,
@@ -54,21 +54,37 @@ export async function runPipeline(
     files,
     config.fetchConcurrency,
   );
+  const fileContents = fetchResult.contents;
+  const failedFiles = fetchResult.failed;
+  if (failedFiles.length > 0) {
+    core.warning(`Failed to fetch content for ${failedFiles.length} file(s)`);
+  }
   core.info(`Fetched ${fileContents.size}/${files.length} file contents`);
   core.endGroup();
 
   core.startGroup("Stage 2: Batching");
   const maxSystemPromptTokens = Math.max(...perspectives.map((p) => countTokens(p.systemPrompt)));
   const reviewInstructionsTokens = countTokens(config.reviewInstructions);
-  const crossFileHunksTokens = Math.min(2000, Math.floor(config.contextWindow * 0.05));
+  const crossFileHunksTokens = Math.min(
+    config.crossFileBudgetMax,
+    Math.floor(config.contextWindow * (config.crossFileBudgetRatio / 100)),
+  );
   const tokenBudget = calculateTokenBudget(
     config.contextWindow,
     config.maxOutputTokens,
     maxSystemPromptTokens,
     reviewInstructionsTokens,
     crossFileHunksTokens,
+    config.safetyMargin,
+    files.length,
   );
-  const batches = createBatches(files, fileContents, tokenBudget, config.maxBatches);
+  const batches = createBatches(
+    files,
+    fileContents,
+    tokenBudget,
+    config.maxBatches,
+    failedFiles,
+  );
   core.info(`Created ${batches.length} batches for ${files.length} files`);
   for (const batch of batches) {
     core.info(
@@ -79,7 +95,7 @@ export async function runPipeline(
 
   core.startGroup("Stage 3: Review (matrix)");
   const semaphore = createSemaphore(config.llmConcurrency);
-  const circuitBreaker = createCircuitBreaker(3);
+  const circuitBreaker = createCircuitBreaker(config.circuitBreakerThreshold);
   const llmConfig: LLMCallConfig = {
     apiKey: config.llmApiKey,
     baseUrl: config.llmBaseUrl,
@@ -114,9 +130,8 @@ export async function runPipeline(
     `Matrix: ${batches.length} batches × ${perspectives.length} perspectives = ${matrixCalls.length} LLM calls`,
   );
 
-  const results = await mapWithConcurrency(
-    matrixCalls,
-    ({ batch, perspective, modelOverride, temperatureOverride }) => {
+  const results = await Promise.all(
+    matrixCalls.map(({ batch, perspective, modelOverride, temperatureOverride }) => {
       core.info(`  Reviewing batch ${batch.index} as ${perspective.name}...`);
       return reviewBatchFromPerspective(
         batch,
@@ -125,20 +140,24 @@ export async function runPipeline(
         modelOverride,
         temperatureOverride,
       );
-    },
-    config.llmConcurrency,
+    }),
   );
 
   const failedBatches = Array.from(
-    new Set(results.filter((r) => r.error && !r.review.findings.length).map((r) => r.batchIndex)),
+    new Set(results.filter((r) => r.error).map((r) => r.batchIndex)),
   );
   const unreviewedFiles = batches
     .filter((b) => failedBatches.includes(b.index))
     .flatMap((b) => b.files.map((f) => f.filename));
+  for (const filename of failedFiles) {
+    if (!unreviewedFiles.includes(filename)) {
+      unreviewedFiles.push(filename);
+    }
+  }
 
   const matrixResult: ReviewMatrixResult = {
     results,
-    rawFindings: results.flatMap((r) => r.review.findings),
+    rawFindings: results.filter((r) => !r.error).flatMap((r) => r.review.findings),
     failedBatches,
     unreviewedFiles,
     totalCalls: matrixCalls.length,

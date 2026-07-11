@@ -159,6 +159,27 @@ export function truncateToWindow(
   return { content: result.join("\n"), truncated };
 }
 
+export function truncateTextToBudget(
+  text: string,
+  maxTokens: number,
+): { content: string; truncated: boolean } {
+  if (!text) return { content: text, truncated: false };
+  if (countTokens(text) <= maxTokens) return { content: text, truncated: false };
+
+  let low = 0;
+  let high = text.length;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (countTokens(text.slice(0, mid)) <= maxTokens) {
+      low = mid;
+    } else {
+      high = mid - 1;
+    }
+  }
+
+  return { content: text.slice(0, low), truncated: true };
+}
+
 export function progressiveTruncate(
   content: string,
   patch: string,
@@ -182,5 +203,8 @@ export function progressiveTruncate(
     return { content: window5.content, truncated: true, strategy: "window-5" };
   }
 
-  return { content: patch, truncated: true, strategy: "diff-only" };
+  // Fall back to the raw patch, but never return more tokens than the budget
+  // allows — even a diff-only view must fit inside the batch.
+  const capped = truncateTextToBudget(patch, maxTokens);
+  return { content: capped.content, truncated: true, strategy: "diff-only" };
 }

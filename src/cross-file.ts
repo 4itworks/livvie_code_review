@@ -1,5 +1,6 @@
 import type { Batch } from "./types.js";
 import { countTokens } from "./tokenizer.js";
+import { truncateTextToBudget } from "./truncation.js";
 
 function compactHunkSummary(patch: string): string {
   if (!patch) return "";
@@ -22,21 +23,50 @@ export function buildCrossFileContext(
 
   const parts: string[] = [];
   let tokenCount = 0;
+  let skippedAny = false;
 
   for (const batch of otherBatches) {
     for (const file of batch.files) {
       const header = `### ${file.filename} (in batch ${batch.index} — context only, do not review)`;
-      const summary = compactHunkSummary(file.patch);
-      const section = `${header}\n\`\`\`diff\n${summary}\n\`\`\`\n`;
-      const sectionTokens = countTokens(section);
+      const wrapperTokens = countTokens(`${header}\n\`\`\`diff\n\n\`\`\`\n`);
+      const remaining = maxTokens - tokenCount;
 
+      if (remaining <= 0) {
+        skippedAny = true;
+        break;
+      }
+
+      if (wrapperTokens > remaining) {
+        skippedAny = true;
+        continue;
+      }
+
+      const summaryBudget = remaining - wrapperTokens;
+      let summary = compactHunkSummary(file.patch);
+      let truncated = false;
+      const truncatedMarker = "\n// ... (truncated)";
+      const markerTokens = countTokens(truncatedMarker);
+
+      if (countTokens(summary) > summaryBudget) {
+        const result = truncateTextToBudget(summary, Math.max(0, summaryBudget - markerTokens));
+        summary = result.content;
+        truncated = result.truncated;
+      }
+
+      const section = `${header}\n\`\`\`diff\n${summary}${truncated ? truncatedMarker : ""}\n\`\`\`\n`;
+      const sectionTokens = countTokens(section);
       if (tokenCount + sectionTokens > maxTokens) {
-        return parts.join("\n");
+        skippedAny = true;
+        continue;
       }
 
       parts.push(section);
       tokenCount += sectionTokens;
     }
+  }
+
+  if (skippedAny && parts.length > 0) {
+    parts.push("// ... (cross-file context truncated) ...");
   }
 
   return parts.join("\n");

@@ -4,6 +4,11 @@ import type { DiffFile } from "./types.js";
 import { mapWithConcurrency } from "./concurrency.js";
 import { extractChangedLines } from "./truncation.js";
 
+export interface FileContentsResult {
+  contents: Map<string, string>;
+  failed: string[];
+}
+
 export async function fetchDiff(
   octokit: Octokit,
   owner: string,
@@ -25,20 +30,19 @@ export async function fetchDiff(
 
     const patchSize = file.patch.length;
     if (patchSize > maxDiffSize) {
-      result.push({
-        filename: file.filename,
-        patch: file.patch.slice(0, maxDiffSize) + "\n... (truncated)",
-        additions: file.additions,
-        deletions: file.deletions,
-      });
-    } else {
-      result.push({
-        filename: file.filename,
-        patch: file.patch,
-        additions: file.additions,
-        deletions: file.deletions,
-      });
+      core.warning(
+        `Skipping ${file.filename}: patch size ${patchSize} exceeds max-diff-size ${maxDiffSize}`,
+      );
+      continue;
     }
+
+    result.push({
+      filename: file.filename,
+      patch: file.patch,
+      additions: file.additions,
+      deletions: file.deletions,
+      status: (file.status as DiffFile["status"]) ?? "modified",
+    });
   }
 
   return result;
@@ -51,11 +55,14 @@ export async function fetchFileContentsParallel(
   ref: string,
   files: DiffFile[],
   concurrency: number,
-): Promise<Map<string, string>> {
+): Promise<FileContentsResult> {
   const contents = new Map<string, string>();
+  const failed: string[] = [];
+
+  const filesToFetch = files.filter((file) => file.status !== "removed");
 
   const results = await mapWithConcurrency(
-    files,
+    filesToFetch,
     async (file) => {
       try {
         const response = await octokit.rest.repos.getContent({
@@ -76,24 +83,26 @@ export async function fetchFileContentsParallel(
               return `${lineNum}:${marker} ${line}`;
             })
             .join("\n");
-          return { filename: file.filename, content: numbered };
+          return { filename: file.filename, content: numbered, ok: true as const };
         }
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         core.warning(`Could not fetch content for ${file.filename}: ${msg}`);
       }
-      return { filename: file.filename, content: "" };
+      return { filename: file.filename, content: "", ok: false as const };
     },
     concurrency,
   );
 
-  for (const { filename, content } of results) {
-    if (content) {
+  for (const { filename, content, ok } of results) {
+    if (ok && content) {
       contents.set(filename, content);
+    } else {
+      failed.push(filename);
     }
   }
 
-  return contents;
+  return { contents, failed };
 }
 
 export function isLineInDiff(patch: string, targetLine: number): boolean {

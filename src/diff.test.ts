@@ -1,6 +1,15 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
-import { isLineInDiff } from "./diff.js";
+vi.mock("@actions/core", () => ({
+  warning: vi.fn(),
+  info: vi.fn(),
+  debug: vi.fn(),
+  startGroup: vi.fn(),
+  endGroup: vi.fn(),
+}));
+
+import { isLineInDiff, fetchDiff } from "./diff.js";
+import * as core from "@actions/core";
 
 // ---------------------------------------------------------------------------
 // isLineInDiff
@@ -77,5 +86,42 @@ describe("isLineInDiff", () => {
     expect(isLineInDiff(patch, 22)).toBe(false); // context
     expect(isLineInDiff(patch, 23)).toBe(true);
     expect(isLineInDiff(patch, 24)).toBe(false); // context
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fetchDiff
+// ---------------------------------------------------------------------------
+function makeOctokitMock(files: unknown[]) {
+  return {
+    paginate: vi.fn().mockResolvedValue(files),
+    rest: { pulls: { listFiles: {} } },
+  } as never;
+}
+
+describe("fetchDiff", () => {
+  it("skips files whose patch exceeds maxDiffSize", async () => {
+    const hugePatch = "+" + "x".repeat(100);
+    const files = [
+      { filename: "small.dart", patch: "@@ -1 +1 @@\n+a", additions: 1, deletions: 0 },
+      { filename: "huge.dart", patch: hugePatch, additions: 50, deletions: 50 },
+    ];
+
+    const result = await fetchDiff(makeOctokitMock(files), "owner", "repo", 1, 50);
+
+    expect(result.map((f) => f.filename)).toEqual(["small.dart"]);
+    expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("huge.dart"));
+  });
+
+  it("includes files whose patch is within maxDiffSize", async () => {
+    const files = [
+      { filename: "a.dart", patch: "@@ -1 +1 @@\n+a", additions: 1, deletions: 0 },
+      { filename: "b.dart", patch: "@@ -2 +2 @@\n+b", additions: 1, deletions: 0 },
+    ];
+
+    const result = await fetchDiff(makeOctokitMock(files), "owner", "repo", 1, 1000);
+
+    expect(result).toHaveLength(2);
+    expect(result[0].patch).not.toContain("truncated");
   });
 });
