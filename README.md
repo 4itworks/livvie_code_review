@@ -346,7 +346,18 @@ jobs:
 
 ### 4. Add review instructions (optional)
 
-Create `.github/code-reviewer.md` in your repo with project-specific context (tech stack, coding standards, conventions). This is orthogonal to agent files — agents define *how* to review, instructions define *what the project is*.
+Create `.github/code-reviewer.md` in your repo with project-specific context (tech stack, coding standards, conventions).
+
+**How this differs from agent files:** agent `.md` files define *who* reviews (the persona and focus areas). The review instructions file defines *what the project is* — context that every agent needs, regardless of their specialty. Think of it as:
+
+| | Agent `.md` file | `review-instructions-file` |
+|---|---|---|
+| **What** | Reviewer persona + focus areas | Project context + conventions |
+| **Goes into** | System prompt (per agent) | User message (all agents) |
+| **Example** | "You are a Security Reviewer. Focus on injection, secrets..." | "This is a Flutter monorepo with BLoC, using mocktail for tests. No single-letter vars." |
+| **Scope** | One per reviewer | Shared across all reviewers |
+
+If every agent needs the same project context, use `review-instructions-file` (DRY). If a specific agent needs unique context, add it to that agent's `.md` body.
 
 ## Inputs
 
@@ -357,7 +368,7 @@ Create `.github/code-reviewer.md` in your repo with project-specific context (te
 | `llm-base-url` | no | `https://openrouter.ai/api/v1` | OpenAI-compatible base URL (plain string) |
 | `model` | yes | — | Model name (plain string, e.g. `z-ai/glm-5.2`) |
 | `agents-dir` | no | `.github/livvie_code_review_agents` | Directory containing agent `.md` files |
-| `review-instructions-file` | no | `.github/code-reviewer.md` | Extra review instructions |
+| `review-instructions-file` | no | `.github/code-reviewer.md` | Project context file (tech stack, conventions). Shared across all agents. See [How this differs from agent files](#4-add-review-instructions-optional). |
 | `max-diff-size` | no | `50000` | Max diff chars per file |
 | `max-output-tokens` | no | `16000` | Max response tokens |
 | `reasoning-effort` | no | `none` | Reasoning effort (none, low, medium, high, max) |
