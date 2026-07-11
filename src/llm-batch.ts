@@ -14,6 +14,11 @@ import {
 } from "./circuit-breaker.js";
 import { parseReview } from "./llm.js";
 
+const LLM_REQUEST_TIMEOUT_MS = 120_000;
+const DEFAULT_TEMPERATURE = 0.1;
+const MIN_CONTENT_LENGTH = 20;
+const SHORT_CONTENT_WARNING_LENGTH = 100;
+
 interface LLMChoice {
   message?: {
     content?: string;
@@ -43,6 +48,8 @@ export async function reviewBatchFromPerspective(
   batch: Batch,
   perspective: Perspective,
   config: LLMCallConfig,
+  modelOverride?: string,
+  temperatureOverride?: number,
 ): Promise<BatchReviewResult> {
   const skipPrimary = config.circuitBreaker.check();
   const release = await config.semaphore.acquire();
@@ -60,13 +67,13 @@ export async function reviewBatchFromPerspective(
         const result = await callLLMWithRetry(
           config.apiKey,
           config.baseUrl,
-          config.model,
+          modelOverride ?? config.model,
           perspective.systemPrompt,
           userContent,
           config.maxOutputTokens,
           config.reasoningEffort,
           config.maxRetries,
-          config.circuitBreaker,
+          temperatureOverride,
         );
         config.circuitBreaker.recordSuccess();
         review = parseReview(result.content, perspective.id);
@@ -98,7 +105,7 @@ export async function reviewBatchFromPerspective(
           config.maxOutputTokens,
           "none",
           config.maxRetries,
-          config.circuitBreaker,
+          temperatureOverride,
         );
         config.circuitBreaker.recordSuccess();
         review = parseReview(result.content, perspective.id);
@@ -188,7 +195,7 @@ export async function callLLMWithRetry(
   maxOutputTokens: number,
   reasoningEffort: string,
   maxRetries: number,
-  _circuitBreaker: ReturnType<typeof createCircuitBreaker>,
+  temperatureOverride?: number,
 ): Promise<{ content: string; modelUsed: string }> {
   const requestBody: Record<string, unknown> = {
     model,
@@ -196,7 +203,7 @@ export async function callLLMWithRetry(
       { role: "system", content: systemPrompt },
       { role: "user", content: userContent },
     ],
-    temperature: 0.1,
+    temperature: temperatureOverride ?? DEFAULT_TEMPERATURE,
     max_tokens: maxOutputTokens,
     response_format: { type: "json_object" },
   };
@@ -211,7 +218,7 @@ export async function callLLMWithRetry(
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120_000);
+      const timeoutId = setTimeout(() => controller.abort(), LLM_REQUEST_TIMEOUT_MS);
       let response: Response;
       try {
         response = await fetch(`${baseUrl}/chat/completions`, {
@@ -262,7 +269,7 @@ export async function callLLMWithRetry(
       const reasoningContent = choices?.[0]?.message?.reasoning_content;
       const finishReason = choices?.[0]?.finish_reason;
 
-      if (!content || content.length < 20) {
+      if (!content || content.length < MIN_CONTENT_LENGTH) {
         const detail =
           finishReason === "length"
             ? `Model hit token limit (finish_reason: length). Reasoning consumed all ${maxOutputTokens} tokens with none left for output. Increase max-output-tokens or reduce reasoning-effort.`
@@ -270,7 +277,7 @@ export async function callLLMWithRetry(
         throw new Error(`LLM returned empty/short response: ${detail}`);
       }
 
-      if (content.length < 100) {
+      if (content.length < SHORT_CONTENT_WARNING_LENGTH) {
         core.warning(`LLM response is suspiciously short (${content.length} chars): "${content}"`);
       }
 

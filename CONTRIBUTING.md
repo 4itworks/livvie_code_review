@@ -119,7 +119,7 @@ src/
   cross-file.ts       # Cross-batch context building
   tokenizer.ts        # Token counting, budget calculation
   truncation.ts       # Progressive file truncation
-  perspectives.ts     # Review perspective definitions and prompts
+  agent-loader.ts     # Agent loading from GitHub, frontmatter parsing
   ignore-patterns.ts  # Glob pattern matching for file filtering
 ```
 
@@ -130,28 +130,22 @@ src/
 - **Circuit breaker**: After 3 consecutive LLM failures, the primary model is skipped for 30s before retrying
 - **Deduplication**: Findings from different perspectives on the same file within ±3 lines are merged if descriptions are similar
 
-## Adding a New Perspective
+## Adding a New Agent
 
-1. Open `src/perspectives.ts`
-2. Add a new prompt constant (follow the existing pattern):
-   ```typescript
-   const TESTING_PROMPT = `You are a **Testing Reviewer**...
+1. Create a new `.md` file in `.github/livvie_code_review_agents/` (e.g., `testing.md`)
+2. Add frontmatter and the system prompt body:
+   ```markdown
+   ---
+   name: Testing Reviewer
+   focus: test coverage, test quality, edge cases
+   ---
+
+   You are a **Testing Reviewer**...
    ## Your focus areas
    - ...
-   ${SHARED_REVIEW_RULES}`;
    ```
-3. Register it in `PERSPECTIVE_REGISTRY`:
-   ```typescript
-   "testing": {
-     id: "testing",
-     name: "Testing Reviewer",
-     focus: "test coverage, test quality, edge cases",
-     systemPrompt: TESTING_PROMPT,
-   },
-   ```
-4. Add tests in `src/perspectives.test.ts`
-5. Update the `action.yml` `perspectives` input description
-6. Update the README perspectives table
+3. Add tests in `src/agent-loader.test.ts`
+4. Update the README perspectives table
 
 ## Adding Tests
 

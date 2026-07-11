@@ -7,6 +7,8 @@ import type {
   ReviewStats,
 } from "./types.js";
 
+const MAX_FINDINGS = 100;
+
 const SEVERITY_ORDER: Record<string, number> = {
   high: 3,
   medium: 2,
@@ -27,7 +29,7 @@ export function consolidateReviews(
 ): ConsolidatedReview {
   const deduplicated = deduplicateFindings(matrixResult.rawFindings);
   const sorted = sortFindings(deduplicated);
-  const { kept } = capFindings(sorted, 100);
+  const { kept } = capFindings(sorted, MAX_FINDINGS);
 
   const summary = mergeSummaries(matrixResult, perspectives);
   const perspectiveSummaries = buildPerspectiveSummaries(matrixResult, perspectives);
@@ -66,14 +68,14 @@ export function deduplicateFindings(findings: ReviewFinding[]): ReviewFinding[] 
   for (const current of sorted) {
     let merged = false;
 
-    for (let j = 0; j < result.length; j++) {
-      const existing = result[j];
+    for (let existingIndex = 0; existingIndex < result.length; existingIndex++) {
+      const existing = result[existingIndex];
       if (areFindingsDuplicate(current, existing)) {
         const winner = compareFindings(current, existing) > 0 ? current : existing;
         const loser = winner === current ? existing : current;
         const foundBy = Array.from(new Set<string>([...winner.foundBy, ...loser.foundBy]));
 
-        result[j] = {
+        result[existingIndex] = {
           ...winner,
           foundBy: [...foundBy],
         };

@@ -5,7 +5,6 @@ import { fetchDiff, fetchFileContentsParallel } from "./diff.js";
 import { filterIgnoredFiles } from "./ignore-patterns.js";
 import { countTokens, calculateTokenBudget } from "./tokenizer.js";
 import { createBatches } from "./batcher.js";
-import { getPerspectives } from "./perspectives.js";
 import { createSemaphore, mapWithConcurrency } from "./concurrency.js";
 import { createCircuitBreaker } from "./circuit-breaker.js";
 import { reviewBatchFromPerspective, type LLMCallConfig } from "./llm-batch.js";
@@ -14,6 +13,7 @@ import { postReview } from "./post.js";
 
 export async function runPipeline(
   config: PipelineConfig,
+  perspectives: Perspective[],
 ): Promise<{ reviewId: number; findingCount: number }> {
   const octokit = new Octokit({ auth: config.githubToken });
 
@@ -58,7 +58,6 @@ export async function runPipeline(
   core.endGroup();
 
   core.startGroup("Stage 2: Batching");
-  const perspectives = getPerspectives(config.perspectives);
   const maxSystemPromptTokens = Math.max(...perspectives.map((p) => countTokens(p.systemPrompt)));
   const reviewInstructionsTokens = countTokens(config.reviewInstructions);
   const crossFileHunksTokens = Math.min(2000, Math.floor(config.contextWindow * 0.05));
@@ -71,8 +70,10 @@ export async function runPipeline(
   );
   const batches = createBatches(files, fileContents, tokenBudget, config.maxBatches);
   core.info(`Created ${batches.length} batches for ${files.length} files`);
-  for (const b of batches) {
-    core.info(`  Batch ${b.index}: ${b.files.length} files, ${b.totalTokenCount} tokens`);
+  for (const batch of batches) {
+    core.info(
+      `  Batch ${batch.index}: ${batch.files.length} files, ${batch.totalTokenCount} tokens`,
+    );
   }
   core.endGroup();
 
@@ -92,10 +93,21 @@ export async function runPipeline(
     maxRetries: 3,
   };
 
-  const matrixCalls: Array<{ batch: Batch; perspective: Perspective }> = [];
+  const matrixCalls: Array<{
+    batch: Batch;
+    perspective: Perspective;
+    modelOverride?: string;
+    temperatureOverride?: number;
+  }> = [];
   for (const batch of batches) {
     for (const perspective of perspectives) {
-      matrixCalls.push({ batch, perspective });
+      const overrides = config.agentModelOverrides.get(perspective.id);
+      matrixCalls.push({
+        batch,
+        perspective,
+        modelOverride: overrides?.model ?? undefined,
+        temperatureOverride: overrides?.temperature ?? undefined,
+      });
     }
   }
   core.info(
@@ -104,9 +116,15 @@ export async function runPipeline(
 
   const results = await mapWithConcurrency(
     matrixCalls,
-    ({ batch, perspective }) => {
+    ({ batch, perspective, modelOverride, temperatureOverride }) => {
       core.info(`  Reviewing batch ${batch.index} as ${perspective.name}...`);
-      return reviewBatchFromPerspective(batch, perspective, llmConfig);
+      return reviewBatchFromPerspective(
+        batch,
+        perspective,
+        llmConfig,
+        modelOverride,
+        temperatureOverride,
+      );
     },
     config.llmConcurrency,
   );
@@ -142,6 +160,7 @@ export async function runPipeline(
   core.endGroup();
 
   core.startGroup("Stage 5: Post");
+  const perspectiveNameMap = new Map(perspectives.map((p) => [p.id, p.name]));
   const reviewId = await postReview(
     octokit,
     config.owner,
@@ -151,6 +170,7 @@ export async function runPipeline(
     files,
     config.requestChangesOnHigh,
     config.maxComments,
+    perspectiveNameMap,
   );
   core.endGroup();
 
