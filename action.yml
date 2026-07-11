@@ -76,5 +76,5 @@ outputs:
     description: "Total number of findings in the review."
 
 runs:
-  using: "node20"
+  using: "node22"
   main: "dist/index.js"
