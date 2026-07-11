@@ -68,12 +68,40 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
       - uses: 4itworks/livvie_code_review@v2
         with:
+          # Required
           github-token: ${{ secrets.GITHUB_TOKEN }}
           llm-api-key: ${{ secrets.LLM_API_KEY }}
-          llm-base-url: "https://openrouter.ai/api/v1"
           model: "z-ai/glm-5.2"
+
+          # LLM provider (default: OpenRouter)
+          llm-base-url: "https://openrouter.ai/api/v1"
+          fallback-model: ""
+
+          # Agent files (default: .github/livvie_code_review_agents)
+          agents-dir: ".github/livvie_code_review_agents"
+
+          # Project context file (shared across all agents)
+          review-instructions-file: ".github/code-reviewer.md"
+
+          # Token & context limits
+          context-window: "128000"
+          max-output-tokens: "16000"
+          max-diff-size: "50000"
+          reasoning-effort: "none"
+
+          # Cost control
+          max-batches: "0"
+          max-comments: "25"
+
+          # Review behavior
+          request-changes-on-high: "true"
+          ignore-patterns: "build/**,dist/**,node_modules/**"
+
+          # Debugging
+          verbose: "false"
 ```
 
 ---
