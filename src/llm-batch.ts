@@ -14,6 +14,18 @@ import {
 } from "./circuit-breaker.js";
 import { parseReview } from "./llm.js";
 
+interface LLMChoice {
+  message?: {
+    content?: string;
+    reasoning_content?: string;
+  };
+  finish_reason?: string;
+}
+
+interface LLMResponseData {
+  choices?: LLMChoice[];
+}
+
 export interface LLMCallConfig {
   apiKey: string;
   baseUrl: string;
@@ -235,7 +247,7 @@ export async function callLLMWithRetry(
 
       const responseText = await response.text();
 
-      let data: any;
+      let data: LLMResponseData | undefined;
       try {
         data = JSON.parse(responseText);
       } catch {
@@ -245,9 +257,10 @@ export async function callLLMWithRetry(
         );
       }
 
-      const content = data.choices?.[0]?.message?.content;
-      const reasoningContent = data.choices?.[0]?.message?.reasoning_content;
-      const finishReason = data.choices?.[0]?.finish_reason;
+      const choices = data?.choices;
+      const content = choices?.[0]?.message?.content;
+      const reasoningContent = choices?.[0]?.message?.reasoning_content;
+      const finishReason = choices?.[0]?.finish_reason;
 
       if (!content || content.length < 20) {
         const detail =

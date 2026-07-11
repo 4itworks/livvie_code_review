@@ -39,7 +39,7 @@ export async function postReview(
       comments,
     });
     reviewId = response.data.id;
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (comments.length > 0 && shouldRetryWithoutInline(error)) {
       core.warning("GitHub rejected inline comments, retrying as single-line...");
 
@@ -292,9 +292,11 @@ function buildReviewBody(
   return parts.join("\n");
 }
 
-function shouldRetryWithoutInline(error: any): boolean {
-  if (error?.status !== 422) return false;
-  const details = JSON.stringify(error?.response?.data || error?.message || "");
+function shouldRetryWithoutInline(error: unknown): boolean {
+  const err = error as Record<string, unknown> | undefined;
+  if (err?.status !== 422) return false;
+  const response = err.response as Record<string, unknown> | undefined;
+  const details = JSON.stringify(response?.data || err?.message || "");
   return /position|line|side|diff/i.test(details);
 }
 

@@ -2,11 +2,6 @@ import * as core from "@actions/core";
 import type { StructuredReview, ReviewFinding } from "./types.js";
 import { validateSuggestion } from "./suggestion.js";
 
-interface LLMResponse {
-  summary: string;
-  findings: ReviewFinding[];
-}
-
 export function parseReview(content: string, perspectiveId: string): StructuredReview {
   const jsonText = extractJson(content);
 
@@ -18,11 +13,13 @@ export function parseReview(content: string, perspectiveId: string): StructuredR
     if (repaired) {
       core.info("Successfully repaired JSON from raw text response.");
       try {
-        const parsed = JSON.parse(repaired) as LLMResponse;
+        const parsed: unknown = JSON.parse(repaired);
+        const obj = parsed as Record<string, unknown>;
+        const findings = Array.isArray(obj.findings) ? obj.findings : [];
         return {
-          summary: parsed.summary || content.slice(0, 200),
-          findings: (parsed.findings || [])
-            .map((f: any) => normalizeFinding(f, perspectiveId))
+          summary: typeof obj.summary === "string" ? obj.summary : content.slice(0, 200),
+          findings: findings
+            .map((f) => normalizeFinding(f as Record<string, unknown>, perspectiveId))
             .filter(isValidFinding),
         };
       } catch (error) {
@@ -33,11 +30,13 @@ export function parseReview(content: string, perspectiveId: string): StructuredR
   }
 
   try {
-    const parsed = JSON.parse(jsonText) as LLMResponse;
+    const parsed: unknown = JSON.parse(jsonText);
+    const obj = parsed as Record<string, unknown>;
+    const findings = Array.isArray(obj.findings) ? obj.findings : [];
     return {
-      summary: parsed.summary || "",
-      findings: (parsed.findings || [])
-        .map((f: any) => normalizeFinding(f, perspectiveId))
+      summary: typeof obj.summary === "string" ? obj.summary : "",
+      findings: findings
+        .map((f) => normalizeFinding(f as Record<string, unknown>, perspectiveId))
         .filter(isValidFinding),
     };
   } catch (error) {
