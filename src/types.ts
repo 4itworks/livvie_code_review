@@ -137,6 +137,10 @@ export interface PipelineConfig {
   maxComments: number;
   fetchConcurrency: number;
   llmConcurrency: number;
+  safetyMargin: number;
+  crossFileBudgetRatio: number;
+  crossFileBudgetMax: number;
+  circuitBreakerThreshold: number;
 }
 
 export interface TokenBudget {

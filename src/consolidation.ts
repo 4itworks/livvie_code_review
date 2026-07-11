@@ -100,7 +100,7 @@ function compareFindings(a: ReviewFinding, b: ReviewFinding): number {
 
 export function areFindingsDuplicate(a: ReviewFinding, b: ReviewFinding): boolean {
   if (a.file !== b.file || Math.abs(a.line - b.line) > 3) return false;
-  if (a.perspective === b.perspective) return true;
+
   const descA = a.description.toLowerCase();
   const descB = b.description.toLowerCase();
   const wordsA = new Set(descA.split(/\s+/).filter((w) => w.length > 3));

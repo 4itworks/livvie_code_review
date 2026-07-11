@@ -15,14 +15,24 @@ export function createCircuitBreaker(threshold?: number): {
     threshold: failureThreshold,
   };
 
+  let probeInFlight = false;
+
   return {
     check(): boolean {
       if (status.state === "open") {
         if (status.openedAt && Date.now() - status.openedAt >= COOLDOWN_MS) {
           status.state = "half-open";
+          probeInFlight = true;
           return false;
         }
         return true;
+      }
+      if (status.state === "half-open") {
+        if (probeInFlight) {
+          return true;
+        }
+        probeInFlight = true;
+        return false;
       }
       return false;
     },
@@ -30,6 +40,7 @@ export function createCircuitBreaker(threshold?: number): {
       status.consecutiveFailures = 0;
       status.state = "closed";
       status.openedAt = null;
+      probeInFlight = false;
     },
     recordFailure(): void {
       status.consecutiveFailures += 1;
@@ -37,6 +48,7 @@ export function createCircuitBreaker(threshold?: number): {
         status.state = "open";
         status.openedAt = Date.now();
       }
+      probeInFlight = false;
     },
     getStatus(): CircuitBreakerStatus {
       return { ...status };

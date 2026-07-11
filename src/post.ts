@@ -132,7 +132,7 @@ function buildComments(
 
     if (hasBalancedSuggestion) {
       const startLine = finding.suggestionStartLine ?? calculateStartLine(finding);
-      if (startLine && startLine < finding.line) {
+      if (startLine && startLine < finding.line && isLineInDiff(diffFile.patch, startLine)) {
         comment.start_line = startLine;
         comment.start_side = "RIGHT";
       }

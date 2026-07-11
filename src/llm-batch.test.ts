@@ -325,17 +325,17 @@ describe("reviewBatchFromPerspective", () => {
   });
 
   it("does not retry on invalid JSON response (non-retryable)", async () => {
-    const whitespaceResponse = {
+    const invalidJsonResponse = {
       ok: true,
       status: 200,
       headers: { get: () => null },
-      text: () => Promise.resolve("   \n\n   "),
+      text: () => Promise.resolve("not json"),
     } as unknown as Response;
 
     const mockFetch = vi
       .fn()
-      .mockResolvedValueOnce(whitespaceResponse)
-      .mockResolvedValueOnce(whitespaceResponse);
+      .mockResolvedValueOnce(invalidJsonResponse)
+      .mockResolvedValueOnce(invalidJsonResponse);
     globalThis.fetch = mockFetch;
 
     const batch = makeBatch(0, ["lib/main.dart"]);
@@ -348,6 +348,37 @@ describe("reviewBatchFromPerspective", () => {
     expect(result.error).toBeDefined();
     expect(result.error).toContain("Primary model:");
     expect(result.error).toContain("Fallback model:");
+  });
+
+  it("retries on empty response body (retryable)", async () => {
+    const emptyResponse = {
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      text: () => Promise.resolve(""),
+    } as unknown as Response;
+
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce(emptyResponse)
+      .mockResolvedValueOnce(emptyResponse)
+      .mockResolvedValueOnce(makeSuccessResponse(validReviewJson));
+    globalThis.fetch = mockFetch;
+
+    vi.mocked(parseReview).mockReturnValue({
+      summary: "OK",
+      findings: [],
+    });
+
+    const batch = makeBatch(0, ["lib/main.dart"]);
+    const perspective = makePerspective("generalist");
+    const config = makeLLMConfig({ maxRetries: 3 });
+
+    const result = await reviewBatchFromPerspective(batch, perspective, config);
+
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(result.error).toBeUndefined();
+    expect(result.modelUsed).toBe("primary-model");
   });
 
   it("retries on API error (retryable)", async () => {

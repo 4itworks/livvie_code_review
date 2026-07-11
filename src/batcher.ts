@@ -62,15 +62,22 @@ export function binPackFiles(
   preparedFiles: PreparedFile[],
   tokenBudget: TokenBudget,
   maxBatches: number,
+  unreviewableFiles: string[],
 ): Batch[] {
-  const sorted = [...preparedFiles].sort((a, b) =>
-    a.filename < b.filename ? -1 : a.filename > b.filename ? 1 : 0,
-  );
+  const sorted = [...preparedFiles].sort((a, b) => a.filename.localeCompare(b.filename));
 
   const batches: Batch[] = [];
   const directoryBatchIndex = new Map<string, number>();
 
   for (const file of sorted) {
+    if (file.tokenCount > tokenBudget.fileBudget) {
+      core.warning(
+        `File ${file.filename} (${file.tokenCount} tokens) exceeds single-file budget (${tokenBudget.fileBudget}). Marking as unreviewable.`,
+      );
+      unreviewableFiles.push(file.filename);
+      continue;
+    }
+
     let targetBatch: Batch | null = null;
 
     const dirIndex = directoryBatchIndex.get(file.directory);
@@ -93,16 +100,22 @@ export function binPackFiles(
     if (targetBatch) {
       targetBatch.files.push(file);
       targetBatch.tokenCount += file.tokenCount;
-      directoryBatchIndex.set(file.directory, targetBatch.index);
+      if (
+        dirIndex !== undefined &&
+        dirIndex < batches.length &&
+        batches[dirIndex] === targetBatch
+      ) {
+        directoryBatchIndex.set(file.directory, targetBatch.index);
+      }
       continue;
     }
 
     if (maxBatches > 0 && batches.length >= maxBatches) {
       const lastBatch = batches[batches.length - 1];
-      if (lastBatch.tokenCount + file.tokenCount > tokenBudget.fileBudget * 2) {
+      if (lastBatch.tokenCount + file.tokenCount > tokenBudget.fileBudget) {
         core.warning(
-          `Batch ${lastBatch.index} overflow: ${lastBatch.tokenCount} + ${file.tokenCount} tokens exceeds 2x budget (${tokenBudget.fileBudget}). ` +
-            `File ${file.filename} may cause LLM truncation. Consider increasing max-batches.`,
+          `Batch ${lastBatch.index} overflow: ${lastBatch.tokenCount} + ${file.tokenCount} tokens exceeds budget (${tokenBudget.fileBudget}). ` +
+            `File ${file.filename} forced into last batch because max-batches=${maxBatches}. Consider increasing max-batches or context-window.`,
         );
       }
       lastBatch.files.push(file);
@@ -137,9 +150,11 @@ export function createBatches(
   fileContents: Map<string, string>,
   tokenBudget: TokenBudget,
   maxBatches: number,
+  failedFiles: string[] = [],
 ): Batch[] {
+  const unreviewableFiles: string[] = [...failedFiles];
   const prepared = prepareFiles(files, fileContents, tokenBudget);
-  const batches = binPackFiles(prepared, tokenBudget, maxBatches);
+  const batches = binPackFiles(prepared, tokenBudget, maxBatches, unreviewableFiles);
   assignCrossFileContext(batches, tokenBudget);
   return batches;
 }

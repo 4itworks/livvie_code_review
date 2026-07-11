@@ -68,6 +68,22 @@ export function isSuggestionBalanced(code: string): boolean {
       continue;
     }
 
+    if (ch === "`") {
+      i++;
+      while (i < len) {
+        if (code[i] === "\\") {
+          i += 2;
+          continue;
+        }
+        if (code[i] === "`") {
+          i++;
+          break;
+        }
+        i++;
+      }
+      continue;
+    }
+
     if (OPENERS.has(ch)) {
       stack.push(ch);
     } else if (CLOSERS[ch]) {

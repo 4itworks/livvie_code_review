@@ -47,6 +47,15 @@ export function shouldIgnoreFile(filename: string, patterns: string[]): boolean 
     if (regex.test(filename)) {
       return true;
     }
+
+    // Patterns without a slash match the basename anywhere in the tree
+    // (e.g., "*.g.dart" matches both "foo.g.dart" and "lib/foo.g.dart").
+    if (!pattern.includes("/")) {
+      const basename = filename.split("/").pop() ?? filename;
+      if (regex.test(basename)) {
+        return true;
+      }
+    }
   }
   return false;
 }

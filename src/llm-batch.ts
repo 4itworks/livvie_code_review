@@ -107,7 +107,6 @@ export async function reviewBatchFromPerspective(
           config.maxRetries,
           temperatureOverride,
         );
-        config.circuitBreaker.recordSuccess();
         review = parseReview(result.content, perspective.id);
         modelUsed = result.modelUsed;
         usedFallback = true;
@@ -214,6 +213,7 @@ export async function callLLMWithRetry(
 
   const body = JSON.stringify(requestBody);
   let lastError: Error | null = null;
+  let lastResponseStatus: number | undefined;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -236,6 +236,8 @@ export async function callLLMWithRetry(
         clearTimeout(timeoutId);
       }
 
+      lastResponseStatus = response.status;
+
       if (!response.ok) {
         const errorText = await response.text();
         const retryAfter = parseRetryAfter(response.headers.get("retry-after"));
@@ -247,12 +249,19 @@ export async function callLLMWithRetry(
           continue;
         }
         const sanitizedError = errorText
-          .replace(/Bearer\s+[\w-]+/gi, "Bearer [REDACTED]")
+          .replace(/Bearer\s+\S+/gi, "Bearer [REDACTED]")
           .slice(0, 500);
-        throw new Error(`LLM API error ${response.status}: ${sanitizedError}`);
+        const retryableStatus = isRetryableHttpStatus(response.status);
+        throw new Error(
+          `LLM API error ${response.status}${retryableStatus ? " (retryable)" : " (non-retryable)"}: ${sanitizedError}`,
+        );
       }
 
       const responseText = (await response.text()).trim();
+
+      if (responseText.length === 0) {
+        throw new Error(`LLM returned empty response body (status ${response.status})`);
+      }
 
       let data: LLMResponseData | undefined;
       try {
@@ -270,11 +279,15 @@ export async function callLLMWithRetry(
       const finishReason = choices?.[0]?.finish_reason;
 
       if (!content || content.length < MIN_CONTENT_LENGTH) {
-        const detail =
-          finishReason === "length"
-            ? `Model hit token limit (finish_reason: length). Reasoning consumed all ${maxOutputTokens} tokens with none left for output. Increase max-output-tokens or reduce reasoning-effort.`
-            : `content too short (${content?.length || 0} chars, finish_reason: ${finishReason || "unknown"})`;
-        throw new Error(`LLM returned empty/short response: ${detail}`);
+        if (finishReason === "length") {
+          throw new Error(
+            `LLM hit token limit (finish_reason: length). Reasoning consumed all ${maxOutputTokens} tokens with none left for output. ` +
+              `Increase max-output-tokens or reduce reasoning-effort.`,
+          );
+        }
+        throw new Error(
+          `LLM returned empty/short response: content too short (${content?.length || 0} chars, finish_reason: ${finishReason || "unknown"})`,
+        );
       }
 
       if (content.length < SHORT_CONTENT_WARNING_LENGTH) {
@@ -294,12 +307,7 @@ export async function callLLMWithRetry(
       return { content, modelUsed: model };
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
-      const isRetryable =
-        lastError.message.includes("LLM API error") ||
-        lastError.message.includes("aborted") ||
-        lastError.message.includes("fetch failed") ||
-        lastError.message.includes("ETIMEDOUT") ||
-        lastError.message.includes("ECONNRESET");
+      const isRetryable = isRetryableError(lastError, lastResponseStatus);
 
       if (!isRetryable) {
         core.warning(`Batch model returned non-retryable error: ${lastError.message}`);
@@ -317,4 +325,25 @@ export async function callLLMWithRetry(
   }
 
   throw lastError ?? new Error("LLM request failed after retries");
+}
+
+function isRetryableHttpStatus(status: number): boolean {
+  return status === 408 || status === 429 || status >= 500;
+}
+
+function isRetryableError(error: Error, status?: number): boolean {
+  if (status !== undefined) {
+    if (isRetryableHttpStatus(status)) return true;
+    if (status >= 400 && status < 500 && status !== 429) return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("llm returned empty response body") ||
+    message.includes("aborted") ||
+    message.includes("fetch failed") ||
+    message.includes("etimedout") ||
+    message.includes("econnreset") ||
+    message.includes("timeout")
+  );
 }

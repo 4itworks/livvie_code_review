@@ -60,6 +60,22 @@ inputs:
     description: "Context window size in tokens for the model. Used for token budget calculation. Override if your model has a different context window."
     required: false
     default: "128000"
+  cross-file-budget-max:
+    description: "Maximum tokens to allocate for cross-file context in each batch."
+    required: false
+    default: "2000"
+  cross-file-budget-ratio:
+    description: "Percentage of context window (0-100) to allocate for cross-file context."
+    required: false
+    default: "5"
+  safety-margin:
+    description: "Additional tokens reserved for message wrappers and response overhead."
+    required: false
+    default: "500"
+  circuit-breaker-threshold:
+    description: "Consecutive failures before opening the circuit breaker for a model."
+    required: false
+    default: "3"
   agents-dir:
     description: "Directory containing agent .md files that define review perspectives. Each .md file = one reviewer. See README for file format and examples."
     required: false
