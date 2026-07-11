@@ -14,11 +14,7 @@
 
 ---
 
-<table align="center"><tr>
-<td align="center"><a href="https://github.com/4itworks/livvie_code_review/actions/workflows/ci.yml"><img src="https://github.com/4itworks/livvie_code_review/actions/workflows/ci.yml/badge.svg" alt="CI"></a></td>
-<td align="center"><a href="https://github.com/marketplace/actions/livvie-code-review"><img src="https://img.shields.io/badge/GitHub-Marketplace-blue" alt="GitHub Marketplace"></a></td>
-<td align="center"><img src="https://img.shields.io/badge/version-v1-green" alt="Version"></td>
-</tr></table>
+<p align="center"><a href="https://github.com/4itworks/livvie_code_review/actions/workflows/ci.yml"><img src="https://github.com/4itworks/livvie_code_review/actions/workflows/ci.yml/badge.svg" alt="CI"></a> <a href="https://github.com/marketplace/actions/livvie-code-review"><img src="https://img.shields.io/badge/GitHub-Marketplace-blue" alt="GitHub Marketplace"></a> <img src="https://img.shields.io/badge/version-v1-green" alt="Version"></p>
 
 ---
 
