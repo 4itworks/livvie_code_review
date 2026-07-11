@@ -1,5 +1,5 @@
 name: "Livvie Code Review"
-description: "AI code review with multi-perspective specialist reviewers, native GitHub suggestion blocks, and REQUEST_CHANGES support. Bring your own LLM key."
+description: "AI code review with multi-perspective reviewers, native suggestion blocks, and REQUEST_CHANGES support."
 author: "4itworks"
 branding:
   icon: "eye"
