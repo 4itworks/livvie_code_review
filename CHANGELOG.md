@@ -22,7 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Configurable ignore patterns for generated files
 - Verbose mode for LLM reasoning traces (`verbose` input)
 - Action outputs: `review-id`, `finding-count`
-- CI pipeline: typecheck + build verification + dist/ freshness check
+- CI pipeline: typecheck + test + build verification (gate for merge)
+- 209 unit tests (vitest) covering 12 source modules
 
 ### Fixed
 - Circuit breaker now recovers after 30s cooldown (was permanently open)

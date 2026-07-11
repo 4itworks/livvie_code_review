@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/4itworks/livvie_code_review/actions/workflows/self-test.yml"><img src="https://github.com/4itworks/livvie_code_review/actions/workflows/self-test.yml/badge.svg" alt="Self Test"></a>
+  <a href="https://github.com/4itworks/livvie_code_review/actions/workflows/ci.yml"><img src="https://github.com/4itworks/livvie_code_review/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/marketplace/actions/livvie-code-review"><img src="https://img.shields.io/badge/GitHub-Marketplace-blue" alt="GitHub Marketplace"></a>
   <img src="https://img.shields.io/badge/version-1.0.0-green" alt="Version">
 </p>
@@ -231,6 +231,18 @@ Any OpenAI-compatible API works out of the box:
 | OpenAI | `https://api.openai.com/v1` | Direct OpenAI API |
 | Groq | `https://api.groq.com/openai/v1` | Fast inference for cheaper models |
 | Ollama | `http://localhost:11434/v1` | Local models, self-hosted |
+
+## Branch Protection
+
+To require CI checks before merging PRs, enable branch protection on `main`:
+
+1. Go to **Settings → Branches → Add rule**
+2. Set **Branch name pattern** to `main`
+3. Enable **Require status checks to pass before merging**
+4. Select these required checks: `typecheck`, `test`, `build-check`
+5. Enable **Require branches to be up to date before merging**
+
+This ensures every PR passes typecheck, tests, and build verification before merge. The `self-test` (LLM smoke) job is informational only — it doesn't block merges since it requires an API key.
 
 ## License
 
