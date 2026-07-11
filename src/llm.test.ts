@@ -162,7 +162,7 @@ describe("normalizeFinding", () => {
   };
 
   it("complete finding → returned as-is", () => {
-    const result = normalizeFinding(base as any, "security");
+    const result = normalizeFinding(base as Record<string, unknown>, "security");
     expect(result.severity).toBe("high");
     expect(result.confidence).toBe("high");
     expect(result.file).toBe("src/app.ts");
@@ -174,30 +174,30 @@ describe("normalizeFinding", () => {
 
   it('missing severity → defaults to "low"', () => {
     const { severity: _severity, ...rest } = base;
-    const result = normalizeFinding(rest as any, "perf");
+    const result = normalizeFinding(rest as Record<string, unknown>, "perf");
     expect(result.severity).toBe("low");
   });
 
   it('missing confidence → defaults to "medium"', () => {
     const { confidence: _confidence, ...rest } = base;
-    const result = normalizeFinding(rest as any, "perf");
+    const result = normalizeFinding(rest as Record<string, unknown>, "perf");
     expect(result.confidence).toBe("medium");
   });
 
   it("empty file → empty string", () => {
-    const result = normalizeFinding({ ...base, file: "" } as any, "perf");
+    const result = normalizeFinding({ ...base, file: "" } as Record<string, unknown>, "perf");
     expect(result.file).toBe("");
   });
 
   it("line=0 → 0 (but isValidFinding will reject)", () => {
-    const result = normalizeFinding({ ...base, line: 0 } as any, "perf");
+    const result = normalizeFinding({ ...base, line: 0 } as Record<string, unknown>, "perf");
     expect(result.line).toBe(0);
     expect(isValidFinding(result)).toBe(false);
   });
 
   it("suggestion with balanced brackets → kept", () => {
     const result = normalizeFinding(
-      { ...base, suggestion: "if (x) { return null; }" } as any,
+      { ...base, suggestion: "if (x) { return null; }" } as Record<string, unknown>,
       "perf",
     );
     expect(result.suggestion).toBe("if (x) { return null; }");
@@ -205,7 +205,7 @@ describe("normalizeFinding", () => {
 
   it("suggestion with unbalanced brackets → stripped to null", () => {
     const result = normalizeFinding(
-      { ...base, suggestion: "if (x) { return null;" } as any,
+      { ...base, suggestion: "if (x) { return null;" } as Record<string, unknown>,
       "perf",
     );
     expect(result.suggestion).toBeNull();
@@ -213,7 +213,10 @@ describe("normalizeFinding", () => {
 
   it("suggestion_start_line < line → kept", () => {
     const result = normalizeFinding(
-      { ...base, line: 10, suggestion: "fix()", suggestion_start_line: 8 } as any,
+      { ...base, line: 10, suggestion: "fix()", suggestion_start_line: 8 } as Record<
+        string,
+        unknown
+      >,
       "perf",
     );
     expect(result.suggestionStartLine).toBe(8);
@@ -221,7 +224,10 @@ describe("normalizeFinding", () => {
 
   it("suggestion_start_line === line → set to null", () => {
     const result = normalizeFinding(
-      { ...base, line: 10, suggestion: "fix()", suggestion_start_line: 10 } as any,
+      { ...base, line: 10, suggestion: "fix()", suggestion_start_line: 10 } as Record<
+        string,
+        unknown
+      >,
       "perf",
     );
     expect(result.suggestionStartLine).toBeNull();
@@ -229,7 +235,10 @@ describe("normalizeFinding", () => {
 
   it("suggestion_start_line > line → set to null", () => {
     const result = normalizeFinding(
-      { ...base, line: 10, suggestion: "fix()", suggestion_start_line: 15 } as any,
+      { ...base, line: 10, suggestion: "fix()", suggestion_start_line: 15 } as Record<
+        string,
+        unknown
+      >,
       "perf",
     );
     expect(result.suggestionStartLine).toBeNull();
@@ -237,7 +246,10 @@ describe("normalizeFinding", () => {
 
   it("suggestion_start_line = 0 → set to null", () => {
     const result = normalizeFinding(
-      { ...base, line: 10, suggestion: "fix()", suggestion_start_line: 0 } as any,
+      { ...base, line: 10, suggestion: "fix()", suggestion_start_line: 0 } as Record<
+        string,
+        unknown
+      >,
       "perf",
     );
     expect(result.suggestionStartLine).toBeNull();
