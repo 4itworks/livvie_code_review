@@ -39,6 +39,11 @@ export interface Perspective {
   focus: string;
 }
 
+export interface AgentModelOverrides {
+  model: string | null;
+  temperature: number;
+}
+
 export interface PreparedFile {
   filename: string;
   patch: string;
@@ -125,7 +130,8 @@ export interface PipelineConfig {
   maxBatches: number;
   contextWindow: number;
   ignorePatterns: string[];
-  perspectives: string[];
+  agentsDir: string;
+  agentModelOverrides: Map<string, AgentModelOverrides>;
   reviewInstructions: string;
   requestChangesOnHigh: boolean;
   maxComments: number;

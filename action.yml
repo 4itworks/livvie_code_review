@@ -60,10 +60,10 @@ inputs:
     description: "Context window size in tokens for the model. Used for token budget calculation. Override if your model has a different context window."
     required: false
     default: "128000"
-  perspectives:
-    description: "Comma-separated review perspectives to run. Options: code-quality, security, performance, architecture, generalist. Default runs generalist only."
+  agents-dir:
+    description: "Directory containing agent .md files that define review perspectives. Each .md file = one reviewer. See README for file format and examples."
     required: false
-    default: "generalist"
+    default: ".github/livvie_code_review_agents"
   verbose:
     description: "Log LLM reasoning traces and detailed debug info to the Actions log."
     required: false

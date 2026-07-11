@@ -4,7 +4,7 @@ import { Octokit } from "@octokit/rest";
 import { runPipeline } from "./pipeline.js";
 import type { PipelineConfig } from "./types.js";
 import { parseIgnorePatterns } from "./ignore-patterns.js";
-import { parsePerspectivesInput } from "./perspectives.js";
+import { loadAgents } from "./agent-loader.js";
 
 async function run(): Promise<void> {
   try {
@@ -28,6 +28,8 @@ async function run(): Promise<void> {
       core.getInput("review-instructions-file") || ".github/code-reviewer.md";
     const prBaseRef = context.pull_request?.base?.ref ?? "main";
 
+    const agentsDir = core.getInput("agents-dir") || ".github/livvie_code_review_agents";
+
     const octokit = new Octokit({ auth: githubToken });
     const reviewInstructions = await loadReviewInstructions(
       octokit,
@@ -35,6 +37,14 @@ async function run(): Promise<void> {
       repo,
       prBaseRef,
       reviewInstructionsFile,
+    );
+
+    const { perspectives, agentModelOverrides } = await loadAgents(
+      octokit,
+      owner,
+      repo,
+      prBaseRef,
+      agentsDir,
     );
 
     function parsePositiveInt(value: string, name: string, defaultValue: number): number {
@@ -68,7 +78,8 @@ async function run(): Promise<void> {
       ignorePatterns: parseIgnorePatterns(
         core.getInput("ignore-patterns") || "build/**,dist/**,node_modules/**",
       ),
-      perspectives: parsePerspectivesInput(core.getInput("perspectives") || "generalist"),
+      agentsDir,
+      agentModelOverrides,
       reviewInstructions,
       requestChangesOnHigh: core.getInput("request-changes-on-high") !== "false",
       maxComments: parsePositiveInt(core.getInput("max-comments"), "max-comments", 25),
@@ -82,10 +93,10 @@ async function run(): Promise<void> {
     process.env.LIVVIE_VERBOSE = verbose ? "1" : "";
 
     core.info(`Reviewing PR #${pullNumber} in ${owner}/${repo}`);
-    core.info(`Perspectives: ${config.perspectives.join(", ")}`);
+    core.info(`Agents: ${perspectives.map((p) => p.name).join(", ")}`);
     core.info(`Max batches: ${config.maxBatches || "unlimited"}`);
 
-    const { reviewId, findingCount } = await runPipeline(config);
+    const { reviewId, findingCount } = await runPipeline(config, perspectives);
     if (reviewId > 0) {
       core.setOutput("review-id", String(reviewId));
       core.setOutput("finding-count", String(findingCount));
@@ -119,8 +130,9 @@ async function loadReviewInstructions(
     if ("content" in response.data && response.data.content) {
       return Buffer.from(response.data.content, "base64").toString("utf8");
     }
-  } catch {
-    core.info(`No review instructions file found at ${filePath}`);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    core.info(`No review instructions file found at ${filePath}: ${message}`);
   }
 
   return "";

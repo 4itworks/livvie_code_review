@@ -1,11 +1,17 @@
 import { Octokit } from "@octokit/rest";
 import * as core from "@actions/core";
 import type { ConsolidatedReview, ReviewFinding, ReviewComment, DiffFile } from "./types.js";
-import { PERSPECTIVE_REGISTRY } from "./perspectives.js";
 import { isLineInDiff } from "./diff.js";
 import { isSuggestionBalanced } from "./suggestion.js";
 
 const REVIEW_SIGNATURE = "Livvie Code Review";
+
+function resolvePerspectiveNames(
+  foundBy: string[],
+  perspectiveNameMap: Map<string, string>,
+): string[] {
+  return foundBy.map((id) => perspectiveNameMap.get(id) ?? id);
+}
 
 export async function postReview(
   octokit: Octokit,
@@ -16,9 +22,15 @@ export async function postReview(
   files: DiffFile[],
   requestChangesOnHigh: boolean,
   maxComments: number,
+  perspectiveNameMap: Map<string, string>,
 ): Promise<number> {
-  const { comments, postedFindings } = buildComments(consolidated, files, maxComments);
-  const body = buildReviewBody(consolidated, postedFindings);
+  const { comments, postedFindings } = buildComments(
+    consolidated,
+    files,
+    maxComments,
+    perspectiveNameMap,
+  );
+  const body = buildReviewBody(consolidated, postedFindings, perspectiveNameMap);
 
   const hasHigh = consolidated.findings.some((f) => f.severity === "high");
   const hasFindings = consolidated.findings.length > 0;
@@ -66,7 +78,7 @@ export async function postReview(
           owner,
           repo,
           pull_number: pullNumber,
-          body: buildReviewBody(consolidated, new Set()),
+          body: buildReviewBody(consolidated, new Set(), perspectiveNameMap),
           event,
         });
         reviewId = response.data.id;
@@ -87,6 +99,7 @@ function buildComments(
   consolidated: ConsolidatedReview,
   files: DiffFile[],
   maxComments: number,
+  perspectiveNameMap: Map<string, string>,
 ): { comments: ReviewComment[]; postedFindings: Set<ReviewFinding> } {
   const comments: ReviewComment[] = [];
   const postedFindings = new Set<ReviewFinding>();
@@ -112,7 +125,7 @@ function buildComments(
       path: finding.file,
       line: finding.line,
       side: "RIGHT",
-      body: formatCommentBody(finding),
+      body: formatCommentBody(finding, perspectiveNameMap),
     };
 
     const hasBalancedSuggestion = finding.suggestion && isSuggestionBalanced(finding.suggestion);
@@ -132,7 +145,7 @@ function buildComments(
   return { comments, postedFindings };
 }
 
-function calculateStartLine(finding: ReviewFinding): number | undefined {
+export function calculateStartLine(finding: ReviewFinding): number | undefined {
   if (!finding.suggestion) return undefined;
   const lineCount = finding.suggestion.split("\n").length;
   if (lineCount <= 1) return undefined;
@@ -141,11 +154,14 @@ function calculateStartLine(finding: ReviewFinding): number | undefined {
   return startLine;
 }
 
-function formatCommentBody(finding: ReviewFinding): string {
+export function formatCommentBody(
+  finding: ReviewFinding,
+  perspectiveNameMap: Map<string, string>,
+): string {
   const severityBadge = severityBadgeMap[finding.severity];
   const confidenceIcon = confidenceIconMap[finding.confidence];
 
-  const perspectiveNames = finding.foundBy.map((id) => PERSPECTIVE_REGISTRY[id]?.name ?? id);
+  const perspectiveNames = resolvePerspectiveNames(finding.foundBy, perspectiveNameMap);
   const attribution =
     perspectiveNames.length > 1
       ? `Found by: ${perspectiveNames.join(", ")}`
@@ -190,9 +206,10 @@ const confidenceIconMap: Record<string, string> = {
   low: "❓",
 };
 
-function buildReviewBody(
+export function buildReviewBody(
   consolidated: ConsolidatedReview,
   postedFindings: Set<ReviewFinding>,
+  perspectiveNameMap: Map<string, string>,
 ): string {
   const parts: string[] = [];
 
@@ -214,7 +231,7 @@ function buildReviewBody(
   }
 
   if (consolidated.perspectiveSummaries.length > 0) {
-    parts.push("### 🏷️ Perspective Breakdown");
+    parts.push("### 🏷️ Agent Breakdown");
     parts.push("");
     parts.push("| Perspective | High | Medium | Low | Total |");
     parts.push("|---|---|---|---|---|");
@@ -237,7 +254,7 @@ function buildReviewBody(
       const sevBadge = severityBadgeMap[f.severity];
       const confIcon = confidenceIconMap[f.confidence];
       const shortFile = f.file.split("/").pop() ?? f.file;
-      const perspNames = f.foundBy.map((id) => PERSPECTIVE_REGISTRY[id]?.name ?? id).join(", ");
+      const perspNames = resolvePerspectiveNames(f.foundBy, perspectiveNameMap).join(", ");
       parts.push(
         `| **${i + 1}** | ${sevBadge} ${f.severity} | ${confIcon} ${f.confidence} | \`${shortFile}\` | ${f.line} | ${perspNames} |`,
       );
@@ -254,7 +271,7 @@ function buildReviewBody(
       const f = unposted[i];
       const sevBadge = severityBadgeMap[f.severity];
       const confIcon = confidenceIconMap[f.confidence];
-      const perspNames = f.foundBy.map((id) => PERSPECTIVE_REGISTRY[id]?.name ?? id).join(", ");
+      const perspNames = resolvePerspectiveNames(f.foundBy, perspectiveNameMap).join(", ");
       parts.push(
         `${sevBadge} **${i + 1}** — \`${f.file}:${f.line}\` · ${confIcon} ${f.confidence} · Found by: ${perspNames}`,
       );
@@ -292,7 +309,7 @@ function buildReviewBody(
   return parts.join("\n");
 }
 
-function shouldRetryWithoutInline(error: unknown): boolean {
+export function shouldRetryWithoutInline(error: unknown): boolean {
   const err = error as Record<string, unknown> | undefined;
   if (err?.status !== 422) return false;
   const response = err.response as Record<string, unknown> | undefined;
