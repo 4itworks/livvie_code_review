@@ -64,8 +64,8 @@ function attemptJsonRepair(content: string): string | null {
     }
   }
 
-  let start = content.indexOf("{");
-  let end = content.lastIndexOf("}");
+  const start = content.indexOf("{");
+  const end = content.lastIndexOf("}");
   if (start !== -1 && end > start) {
     let candidate2 = content.slice(start, end + 1).trim();
     candidate2 = fixTrailingCommas(candidate2);
@@ -86,13 +86,13 @@ function fixTrailingCommas(json: string): string {
 }
 
 function fixUnclosedBraces(json: string): string {
-  let opens = (json.match(/{/g) || []).length;
-  let closes = (json.match(/}/g) || []).length;
+  const opens = (json.match(/{/g) || []).length;
+  const closes = (json.match(/}/g) || []).length;
   if (opens > closes) {
     json += "}".repeat(opens - closes);
   }
-  let openBrackets = (json.match(/\[/g) || []).length;
-  let closeBrackets = (json.match(/]/g) || []).length;
+  const openBrackets = (json.match(/\[/g) || []).length;
+  const closeBrackets = (json.match(/]/g) || []).length;
   if (openBrackets > closeBrackets) {
     json += "]".repeat(openBrackets - closeBrackets);
   }

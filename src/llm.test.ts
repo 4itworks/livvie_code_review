@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 vi.mock("@actions/core", () => ({
   info: vi.fn(),
@@ -173,13 +173,13 @@ describe("normalizeFinding", () => {
   });
 
   it('missing severity → defaults to "low"', () => {
-    const { severity, ...rest } = base;
+    const { severity: _severity, ...rest } = base;
     const result = normalizeFinding(rest as any, "perf");
     expect(result.severity).toBe("low");
   });
 
   it('missing confidence → defaults to "medium"', () => {
-    const { confidence, ...rest } = base;
+    const { confidence: _confidence, ...rest } = base;
     const result = normalizeFinding(rest as any, "perf");
     expect(result.confidence).toBe("medium");
   });

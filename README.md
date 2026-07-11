@@ -264,7 +264,7 @@ To require CI checks before merging PRs, enable branch protection on `main`:
 1. Go to **Settings → Branches → Add rule**
 2. Set **Branch name pattern** to `main`
 3. Enable **Require status checks to pass before merging**
-4. Select these required checks: `lint`, `typecheck`, `test`, `build-check`
+4. Select these required checks: `format`, `lint`, `typecheck`, `test`, `build-check`
 5. Enable **Require branches to be up to date before merging**
 
 This ensures every PR passes formatting, typecheck, tests, and build verification before merge.

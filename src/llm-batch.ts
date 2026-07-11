@@ -176,7 +176,7 @@ export async function callLLMWithRetry(
   maxOutputTokens: number,
   reasoningEffort: string,
   maxRetries: number,
-  circuitBreaker: ReturnType<typeof createCircuitBreaker>,
+  _circuitBreaker: ReturnType<typeof createCircuitBreaker>,
 ): Promise<{ content: string; modelUsed: string }> {
   const requestBody: Record<string, unknown> = {
     model,

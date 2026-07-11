@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 // Mock @actions/core before importing batcher
 vi.mock("@actions/core", () => ({
@@ -33,7 +33,7 @@ import { prepareFiles, binPackFiles, assignCrossFileContext, createBatches } fro
 import type { DiffFile, PreparedFile, TokenBudget, Batch } from "./types.js";
 import * as core from "@actions/core";
 
-function makeFile(name: string, content: string): DiffFile {
+function makeFile(name: string, _content: string): DiffFile {
   return {
     filename: name,
     patch: `@@ -1,1 +1,1 @@\n-old\n+new`,
