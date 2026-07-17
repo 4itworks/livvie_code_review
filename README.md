@@ -69,7 +69,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: 4itworks/livvie_code_review@v2
+      - uses: 4itworks/livvie_code_review@v3
         with:
           # Required
           github-token: ${{ secrets.GITHUB_TOKEN }}
