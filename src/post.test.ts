@@ -340,8 +340,7 @@ describe("postReview", () => {
       1,
       consolidated,
       files,
-      false,
-      false,
+      new Set(["high"]),
       10,
       nameMap,
     );
@@ -360,7 +359,7 @@ describe("postReview", () => {
     );
   });
 
-  it("requests changes when high severity and requestChangesOnHigh", async () => {
+  it("requests changes when findings match a severity in requestChangesOn", async () => {
     const octokit = makeOctokit();
     const finding = makeFinding({ severity: "high", foundBy: ["security"] });
     const consolidated = makeConsolidated({
@@ -369,7 +368,17 @@ describe("postReview", () => {
     const files = [makeDiffFile("lib/main.dart")];
     const nameMap = new Map([["security", "Security Expert"]]);
 
-    await postReview(octokit, "owner", "repo", 1, consolidated, files, true, false, 10, nameMap);
+    await postReview(
+      octokit,
+      "owner",
+      "repo",
+      1,
+      consolidated,
+      files,
+      new Set(["high"]),
+      10,
+      nameMap,
+    );
 
     expect(
       (octokit as unknown as { rest: { pulls: { createReview: ReturnType<typeof vi.fn> } } }).rest
@@ -377,7 +386,7 @@ describe("postReview", () => {
     ).toHaveBeenCalledWith(expect.objectContaining({ event: "REQUEST_CHANGES" }));
   });
 
-  it("always requests changes when alwaysRequestChanges is true and there are findings", async () => {
+  it("comments when findings do not match requestChangesOn severities", async () => {
     const octokit = makeOctokit();
     const finding = makeFinding({ severity: "low", foundBy: ["generalist"] });
     const consolidated = makeConsolidated({
@@ -397,21 +406,41 @@ describe("postReview", () => {
     const files = [makeDiffFile("lib/main.dart")];
     const nameMap = new Map([["generalist", "General Reviewer"]]);
 
-    await postReview(octokit, "owner", "repo", 1, consolidated, files, false, true, 10, nameMap);
+    await postReview(
+      octokit,
+      "owner",
+      "repo",
+      1,
+      consolidated,
+      files,
+      new Set(["high"]),
+      10,
+      nameMap,
+    );
 
     expect(
       (octokit as unknown as { rest: { pulls: { createReview: ReturnType<typeof vi.fn> } } }).rest
         .pulls.createReview,
-    ).toHaveBeenCalledWith(expect.objectContaining({ event: "REQUEST_CHANGES" }));
+    ).toHaveBeenCalledWith(expect.objectContaining({ event: "COMMENT" }));
   });
 
-  it("approves when no findings even if alwaysRequestChanges is true", async () => {
+  it("approves when no findings even if requestChangesOn contains severities", async () => {
     const octokit = makeOctokit();
     const consolidated = makeConsolidated();
     const files = [makeDiffFile("lib/main.dart")];
     const nameMap = new Map<string, string>();
 
-    await postReview(octokit, "owner", "repo", 1, consolidated, files, false, true, 10, nameMap);
+    await postReview(
+      octokit,
+      "owner",
+      "repo",
+      1,
+      consolidated,
+      files,
+      new Set(["low", "medium", "high"]),
+      10,
+      nameMap,
+    );
 
     expect(
       (octokit as unknown as { rest: { pulls: { createReview: ReturnType<typeof vi.fn> } } }).rest

@@ -45,13 +45,25 @@ inputs:
     required: false
     default: "true"
   always-request-changes:
-    description: "Always post REQUEST_CHANGES when any review comment is posted, regardless of severity."
+    description: "(Deprecated) Use request-changes-on instead."
     required: false
     default: "false"
   max-comments:
     description: "Maximum inline comments to post."
     required: false
     default: "25"
+  include-severities:
+    description: "Comma-separated list of severities to include in the review. Options: low, medium, high."
+    required: false
+    default: "low,medium,high"
+  include-confidences:
+    description: "Comma-separated list of confidences to include in the review. Options: low, medium, high."
+    required: false
+    default: "low,medium,high"
+  request-changes-on:
+    description: "Comma-separated list of severities that trigger REQUEST_CHANGES. Use 'low,medium,high' to always request changes."
+    required: false
+    default: "high"
   ignore-patterns:
     description: "Comma-separated glob patterns for files to skip (e.g. *.g.dart,build/). Defaults to generated file patterns."
     required: false

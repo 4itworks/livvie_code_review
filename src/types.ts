@@ -133,8 +133,9 @@ export interface PipelineConfig {
   agentsDir: string;
   agentModelOverrides: Map<string, AgentModelOverrides>;
   reviewInstructions: string;
-  requestChangesOnHigh: boolean;
-  alwaysRequestChanges: boolean;
+  includeSeverities: Set<"low" | "medium" | "high">;
+  includeConfidences: Set<"low" | "medium" | "high">;
+  requestChangesOn: Set<"low" | "medium" | "high">;
   maxComments: number;
   fetchConcurrency: number;
   llmConcurrency: number;
