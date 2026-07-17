@@ -145,6 +145,7 @@ async function run(): Promise<void> {
       agentModelOverrides,
       reviewInstructions,
       requestChangesOnHigh: core.getInput("request-changes-on-high") !== "false",
+      alwaysRequestChanges: core.getInput("always-request-changes") === "true",
       maxComments: parsePositiveInt(core.getInput("max-comments"), "max-comments", 25),
       fetchConcurrency: 5,
       llmConcurrency: 3,
