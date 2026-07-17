@@ -26,9 +26,13 @@ const MAX_SUMMARY_WORDS = 150;
 export function consolidateReviews(
   matrixResult: ReviewMatrixResult,
   perspectives: Perspective[],
+  config?: { includeSeverities?: Set<string>; includeConfidences?: Set<string> },
 ): ConsolidatedReview {
   const deduplicated = deduplicateFindings(matrixResult.rawFindings);
-  const sorted = sortFindings(deduplicated);
+  const filtered = config
+    ? filterFindings(deduplicated, config.includeSeverities, config.includeConfidences)
+    : deduplicated;
+  const sorted = sortFindings(filtered);
   const { kept } = capFindings(sorted, MAX_FINDINGS);
 
   const summary = mergeSummaries(matrixResult, perspectives);
@@ -111,6 +115,22 @@ export function areFindingsDuplicate(a: ReviewFinding, b: ReviewFinding): boolea
   }
   const minSize = Math.min(wordsA.size, wordsB.size);
   return minSize > 0 && overlap / minSize >= 0.5;
+}
+
+export function filterFindings(
+  findings: ReviewFinding[],
+  includeSeverities?: Set<string>,
+  includeConfidences?: Set<string>,
+): ReviewFinding[] {
+  const validSeverities = includeSeverities?.size
+    ? includeSeverities
+    : new Set(["low", "medium", "high"]);
+  const validConfidences = includeConfidences?.size
+    ? includeConfidences
+    : new Set(["low", "medium", "high"]);
+  return findings.filter(
+    (f) => validSeverities.has(f.severity) && validConfidences.has(f.confidence),
+  );
 }
 
 export function sortFindings(findings: ReviewFinding[]): ReviewFinding[] {

@@ -22,6 +22,29 @@ function parseStrictlyPositiveInt(value: string, name: string, defaultValue: num
   return parsed;
 }
 
+function parseLevelList(value: string, name: string): Set<"low" | "medium" | "high"> {
+  const defaultSet = new Set<"low" | "medium" | "high">(["low", "medium", "high"]);
+  const trimmed = (value || "").trim();
+  if (!trimmed) return defaultSet;
+
+  const parts = trimmed
+    .split(",")
+    .map((p) => p.trim().toLowerCase())
+    .filter((p) => p.length > 0);
+
+  const valid: Set<"low" | "medium" | "high"> = new Set();
+  for (const part of parts) {
+    if (part === "low" || part === "medium" || part === "high") {
+      valid.add(part);
+    } else {
+      throw new Error(`Invalid value for ${name}: "${part}". Must be one of: low, medium, high.`);
+    }
+  }
+
+  if (valid.size === 0) return defaultSet;
+  return valid;
+}
+
 function validateUrl(value: string, name: string): void {
   if (!value || !value.trim()) {
     throw new Error(`Invalid value for ${name}: empty string`);
@@ -144,8 +167,12 @@ async function run(): Promise<void> {
       agentsDir,
       agentModelOverrides,
       reviewInstructions,
-      requestChangesOnHigh: core.getInput("request-changes-on-high") !== "false",
-      alwaysRequestChanges: core.getInput("always-request-changes") === "true",
+      includeSeverities: parseLevelList(core.getInput("include-severities"), "include-severities"),
+      includeConfidences: parseLevelList(
+        core.getInput("include-confidences"),
+        "include-confidences",
+      ),
+      requestChangesOn: parseLevelList(core.getInput("request-changes-on"), "request-changes-on"),
       maxComments: parsePositiveInt(core.getInput("max-comments"), "max-comments", 25),
       fetchConcurrency: 5,
       llmConcurrency: 3,

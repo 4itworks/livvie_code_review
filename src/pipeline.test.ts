@@ -60,7 +60,9 @@ function makeConfig(overrides: Partial<PipelineConfig> = {}): PipelineConfig {
     agentsDir: ".agents",
     agentModelOverrides: new Map(),
     reviewInstructions: "Review this code carefully",
-    requestChangesOnHigh: true,
+    includeSeverities: new Set(["low", "medium", "high"]),
+    includeConfidences: new Set(["low", "medium", "high"]),
+    requestChangesOn: new Set(["high"]),
     maxComments: 10,
     fetchConcurrency: 5,
     llmConcurrency: 3,
@@ -312,8 +314,7 @@ describe("runPipeline", () => {
       config.pullNumber,
       consolidated,
       keptFiles,
-      config.requestChangesOnHigh,
-      config.alwaysRequestChanges,
+      config.requestChangesOn,
       config.maxComments,
       expectedMap,
     );
@@ -355,6 +356,7 @@ describe("runPipeline", () => {
         unreviewedFiles: ["lib/failed.dart"],
       }),
       perspectives,
+      config,
     );
   });
 
@@ -389,6 +391,7 @@ describe("runPipeline", () => {
         successfulCalls: expect.any(Number),
       }),
       perspectives,
+      config,
     );
   });
 });

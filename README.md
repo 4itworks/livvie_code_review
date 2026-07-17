@@ -97,8 +97,9 @@ jobs:
           max-comments: "25"
 
           # Review behavior
-          request-changes-on-high: "true"
-          always-request-changes: "false"
+          include-severities: "low,medium,high"
+          include-confidences: "low,medium,high"
+          request-changes-on: "high"
           ignore-patterns: "build/**,dist/**,node_modules/**"
 
           # Debugging
@@ -306,8 +307,10 @@ Use `review-instructions-file` (default: `.github/code-reviewer.md`) for project
 | `max-output-tokens` | no | `16000` | Max response tokens |
 | `reasoning-effort` | no | `none` | Reasoning effort (none, low, medium, high, max) |
 | `fallback-model` | no | `""` | Fallback model if primary fails |
-| `request-changes-on-high` | no | `true` | Block PR on high-severity findings |
-| `always-request-changes` | no | `false` | Post `REQUEST_CHANGES` when any comment is posted, regardless of severity |
+| `fallback-model` | no | `""` | Fallback model if primary fails |
+| `include-severities` | no | `low,medium,high` | Comma-separated severities to include in the review |
+| `include-confidences` | no | `low,medium,high` | Comma-separated confidences to include in the review |
+| `request-changes-on` | no | `high` | Comma-separated severities that trigger `REQUEST_CHANGES` |
 | `max-comments` | no | `25` | Max inline comments per review |
 | `ignore-patterns` | no | `build/**,dist/**,node_modules/**` | Glob patterns for files to skip |
 | `max-batches` | no | `0` | Max batches (0 = unlimited). LLM calls = batches × agents |
@@ -376,7 +379,16 @@ flowchart LR
 4. **Consolidation** — findings deduplicated (same file + ±3 lines = merged), sorted by severity, capped at 100
 5. **Post** — single consolidated review with inline comments, agent breakdown table, and pipeline stats
 
-If any finding is high-severity, the review event is `REQUEST_CHANGES`; otherwise `COMMENT`. When `always-request-changes` is set to `"true"`, any posted review comment becomes `REQUEST_CHANGES` (PRs with no findings remain `APPROVE`). Stale reviews from previous runs are dismissed automatically.
+The review event (`REQUEST_CHANGES`, `COMMENT`, or `APPROVE`) is determined by the `request-changes-on` input. Any finding whose severity is in that list causes the review to become `REQUEST_CHANGES`. PRs with no findings at all receive `APPROVE`.
+
+`include-severities` and `include-confidences` filter which findings are included in the review. For example:
+
+```yaml
+include-confidences: "high"
+request-changes-on: "high,medium"
+```
+
+This posts only high-confidence findings and requests changes when any high or medium severity finding is present. Stale reviews from previous runs are dismissed automatically.
 
 ## Development
 

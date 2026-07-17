@@ -163,9 +163,9 @@ export async function runPipeline(
   core.endGroup();
 
   core.startGroup("Stage 4: Consolidation");
-  const consolidated = consolidateReviews(matrixResult, perspectives);
+  const consolidated = consolidateReviews(matrixResult, perspectives, config);
   core.info(
-    `Consolidated: ${consolidated.findings.length} findings (after dedup), ${consolidated.stats.high} high, ${consolidated.stats.medium} medium, ${consolidated.stats.low} low`,
+    `Consolidated: ${consolidated.findings.length} findings (after dedup and filters), ${consolidated.stats.high} high, ${consolidated.stats.medium} medium, ${consolidated.stats.low} low`,
   );
   if (consolidated.unreviewedFiles.length > 0) {
     core.warning(`Unreviewed files: ${consolidated.unreviewedFiles.join(", ")}`);
@@ -181,8 +181,7 @@ export async function runPipeline(
     config.pullNumber,
     consolidated,
     files,
-    config.requestChangesOnHigh,
-    config.alwaysRequestChanges,
+    config.requestChangesOn,
     config.maxComments,
     perspectiveNameMap,
   );
