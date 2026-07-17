@@ -35,7 +35,7 @@ export async function postReview(
   const hasFindings = consolidated.findings.length > 0;
   const requestChanges =
     hasFindings && consolidated.findings.some((f) => requestChangesOn.has(f.severity));
-  const event = requestChanges ? "REQUEST_CHANGES" : hasFindings ? "COMMENT" : "APPROVE";
+  const event = requestChanges ? "REQUEST_CHANGES" : "APPROVE";
 
   core.info(`Posting ${event} review with ${comments.length} inline comments...`);
 

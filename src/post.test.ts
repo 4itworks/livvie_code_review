@@ -354,7 +354,7 @@ describe("postReview", () => {
         owner: "owner",
         repo: "repo",
         pull_number: 1,
-        event: "COMMENT",
+        event: "APPROVE",
       }),
     );
   });
@@ -386,7 +386,7 @@ describe("postReview", () => {
     ).toHaveBeenCalledWith(expect.objectContaining({ event: "REQUEST_CHANGES" }));
   });
 
-  it("comments when findings do not match requestChangesOn severities", async () => {
+  it("approves when findings do not match requestChangesOn severities", async () => {
     const octokit = makeOctokit();
     const finding = makeFinding({ severity: "low", foundBy: ["generalist"] });
     const consolidated = makeConsolidated({
@@ -421,7 +421,7 @@ describe("postReview", () => {
     expect(
       (octokit as unknown as { rest: { pulls: { createReview: ReturnType<typeof vi.fn> } } }).rest
         .pulls.createReview,
-    ).toHaveBeenCalledWith(expect.objectContaining({ event: "COMMENT" }));
+    ).toHaveBeenCalledWith(expect.objectContaining({ event: "APPROVE" }));
   });
 
   it("approves when no findings even if requestChangesOn contains severities", async () => {
