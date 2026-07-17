@@ -341,6 +341,7 @@ describe("postReview", () => {
       consolidated,
       files,
       false,
+      false,
       10,
       nameMap,
     );
@@ -368,7 +369,7 @@ describe("postReview", () => {
     const files = [makeDiffFile("lib/main.dart")];
     const nameMap = new Map([["security", "Security Expert"]]);
 
-    await postReview(octokit, "owner", "repo", 1, consolidated, files, true, 10, nameMap);
+    await postReview(octokit, "owner", "repo", 1, consolidated, files, true, false, 10, nameMap);
 
     expect(
       (octokit as unknown as { rest: { pulls: { createReview: ReturnType<typeof vi.fn> } } }).rest
@@ -376,13 +377,41 @@ describe("postReview", () => {
     ).toHaveBeenCalledWith(expect.objectContaining({ event: "REQUEST_CHANGES" }));
   });
 
-  it("approves when no findings", async () => {
+  it("always requests changes when alwaysRequestChanges is true and there are findings", async () => {
+    const octokit = makeOctokit();
+    const finding = makeFinding({ severity: "low", foundBy: ["generalist"] });
+    const consolidated = makeConsolidated({
+      findings: [finding],
+      stats: {
+        totalFindings: 1,
+        high: 0,
+        medium: 0,
+        low: 1,
+        totalBatches: 1,
+        totalPerspectives: 1,
+        totalLLMCalls: 1,
+        successfulLLMCalls: 1,
+        failedBatches: 0,
+      },
+    });
+    const files = [makeDiffFile("lib/main.dart")];
+    const nameMap = new Map([["generalist", "General Reviewer"]]);
+
+    await postReview(octokit, "owner", "repo", 1, consolidated, files, false, true, 10, nameMap);
+
+    expect(
+      (octokit as unknown as { rest: { pulls: { createReview: ReturnType<typeof vi.fn> } } }).rest
+        .pulls.createReview,
+    ).toHaveBeenCalledWith(expect.objectContaining({ event: "REQUEST_CHANGES" }));
+  });
+
+  it("approves when no findings even if alwaysRequestChanges is true", async () => {
     const octokit = makeOctokit();
     const consolidated = makeConsolidated();
     const files = [makeDiffFile("lib/main.dart")];
     const nameMap = new Map<string, string>();
 
-    await postReview(octokit, "owner", "repo", 1, consolidated, files, true, 10, nameMap);
+    await postReview(octokit, "owner", "repo", 1, consolidated, files, false, true, 10, nameMap);
 
     expect(
       (octokit as unknown as { rest: { pulls: { createReview: ReturnType<typeof vi.fn> } } }).rest

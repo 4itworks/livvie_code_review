@@ -44,6 +44,10 @@ inputs:
     description: "Post REQUEST_CHANGES when high-severity findings exist."
     required: false
     default: "true"
+  always-request-changes:
+    description: "Always post REQUEST_CHANGES when any review comment is posted, regardless of severity."
+    required: false
+    default: "false"
   max-comments:
     description: "Maximum inline comments to post."
     required: false

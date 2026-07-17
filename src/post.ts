@@ -21,6 +21,7 @@ export async function postReview(
   consolidated: ConsolidatedReview,
   files: DiffFile[],
   requestChangesOnHigh: boolean,
+  alwaysRequestChanges: boolean,
   maxComments: number,
   perspectiveNameMap: Map<string, string>,
 ): Promise<number> {
@@ -34,8 +35,15 @@ export async function postReview(
 
   const hasHigh = consolidated.findings.some((f) => f.severity === "high");
   const hasFindings = consolidated.findings.length > 0;
+  const commentsToPost = alwaysRequestChanges ? comments.length > 0 : hasFindings;
   const event =
-    hasHigh && requestChangesOnHigh ? "REQUEST_CHANGES" : hasFindings ? "COMMENT" : "APPROVE";
+    alwaysRequestChanges && commentsToPost
+      ? "REQUEST_CHANGES"
+      : hasHigh && requestChangesOnHigh
+        ? "REQUEST_CHANGES"
+        : commentsToPost
+          ? "COMMENT"
+          : "APPROVE";
 
   core.info(`Posting ${event} review with ${comments.length} inline comments...`);
 

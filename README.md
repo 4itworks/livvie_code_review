@@ -98,6 +98,7 @@ jobs:
 
           # Review behavior
           request-changes-on-high: "true"
+          always-request-changes: "false"
           ignore-patterns: "build/**,dist/**,node_modules/**"
 
           # Debugging
@@ -306,6 +307,7 @@ Use `review-instructions-file` (default: `.github/code-reviewer.md`) for project
 | `reasoning-effort` | no | `none` | Reasoning effort (none, low, medium, high, max) |
 | `fallback-model` | no | `""` | Fallback model if primary fails |
 | `request-changes-on-high` | no | `true` | Block PR on high-severity findings |
+| `always-request-changes` | no | `false` | Post `REQUEST_CHANGES` when any comment is posted, regardless of severity |
 | `max-comments` | no | `25` | Max inline comments per review |
 | `ignore-patterns` | no | `build/**,dist/**,node_modules/**` | Glob patterns for files to skip |
 | `max-batches` | no | `0` | Max batches (0 = unlimited). LLM calls = batches × agents |
@@ -374,7 +376,7 @@ flowchart LR
 4. **Consolidation** — findings deduplicated (same file + ±3 lines = merged), sorted by severity, capped at 100
 5. **Post** — single consolidated review with inline comments, agent breakdown table, and pipeline stats
 
-If any finding is high-severity, the review event is `REQUEST_CHANGES`; otherwise `COMMENT`. Stale reviews from previous runs are dismissed automatically.
+If any finding is high-severity, the review event is `REQUEST_CHANGES`; otherwise `COMMENT`. When `always-request-changes` is set to `"true"`, any posted review comment becomes `REQUEST_CHANGES` (PRs with no findings remain `APPROVE`). Stale reviews from previous runs are dismissed automatically.
 
 ## Development
 

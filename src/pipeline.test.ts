@@ -313,6 +313,7 @@ describe("runPipeline", () => {
       consolidated,
       keptFiles,
       config.requestChangesOnHigh,
+      config.alwaysRequestChanges,
       config.maxComments,
       expectedMap,
     );
