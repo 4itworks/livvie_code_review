@@ -379,7 +379,7 @@ flowchart LR
 4. **Consolidation** — findings deduplicated (same file + ±3 lines = merged), sorted by severity, capped at 100
 5. **Post** — single consolidated review with inline comments, agent breakdown table, and pipeline stats
 
-The review event (`REQUEST_CHANGES`, `COMMENT`, or `APPROVE`) is determined by the `request-changes-on` input. Any finding whose severity is in that list causes the review to become `REQUEST_CHANGES`. PRs with no findings at all receive `APPROVE`.
+The review event (`REQUEST_CHANGES` or `APPROVE`) is determined by the `request-changes-on` input. Any included finding whose severity is in that list causes the review to become `REQUEST_CHANGES`. If no findings match, the review becomes `APPROVE`. Findings that do not match `request-changes-on` are still posted as inline comments, but do not block the PR. Stale reviews from previous runs are dismissed automatically.
 
 `include-severities` and `include-confidences` filter which findings are included in the review. For example:
 
