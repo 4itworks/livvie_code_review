@@ -342,6 +342,7 @@ describe("postReview", () => {
       files,
       false,
       false,
+      "low",
       10,
       nameMap,
     );
@@ -369,7 +370,19 @@ describe("postReview", () => {
     const files = [makeDiffFile("lib/main.dart")];
     const nameMap = new Map([["security", "Security Expert"]]);
 
-    await postReview(octokit, "owner", "repo", 1, consolidated, files, true, false, 10, nameMap);
+    await postReview(
+      octokit,
+      "owner",
+      "repo",
+      1,
+      consolidated,
+      files,
+      true,
+      false,
+      "low",
+      10,
+      nameMap,
+    );
 
     expect(
       (octokit as unknown as { rest: { pulls: { createReview: ReturnType<typeof vi.fn> } } }).rest
@@ -397,7 +410,19 @@ describe("postReview", () => {
     const files = [makeDiffFile("lib/main.dart")];
     const nameMap = new Map([["generalist", "General Reviewer"]]);
 
-    await postReview(octokit, "owner", "repo", 1, consolidated, files, false, true, 10, nameMap);
+    await postReview(
+      octokit,
+      "owner",
+      "repo",
+      1,
+      consolidated,
+      files,
+      false,
+      true,
+      "low",
+      10,
+      nameMap,
+    );
 
     expect(
       (octokit as unknown as { rest: { pulls: { createReview: ReturnType<typeof vi.fn> } } }).rest
@@ -411,11 +436,85 @@ describe("postReview", () => {
     const files = [makeDiffFile("lib/main.dart")];
     const nameMap = new Map<string, string>();
 
-    await postReview(octokit, "owner", "repo", 1, consolidated, files, false, true, 10, nameMap);
+    await postReview(
+      octokit,
+      "owner",
+      "repo",
+      1,
+      consolidated,
+      files,
+      false,
+      true,
+      "low",
+      10,
+      nameMap,
+    );
 
     expect(
       (octokit as unknown as { rest: { pulls: { createReview: ReturnType<typeof vi.fn> } } }).rest
         .pulls.createReview,
     ).toHaveBeenCalledWith(expect.objectContaining({ event: "APPROVE" }));
+  });
+
+  it("skips inline comments below min-confidence", async () => {
+    const octokit = makeOctokit();
+    const highConf = makeFinding({
+      severity: "medium",
+      confidence: "high",
+      foundBy: ["security"],
+    });
+    const mediumConf = makeFinding({
+      severity: "medium",
+      confidence: "medium",
+      foundBy: ["security"],
+      line: 11,
+    });
+    const lowConf = makeFinding({
+      severity: "medium",
+      confidence: "low",
+      foundBy: ["security"],
+      line: 12,
+    });
+    const consolidated = makeConsolidated({
+      findings: [highConf, mediumConf, lowConf],
+      stats: {
+        totalFindings: 3,
+        high: 0,
+        medium: 3,
+        low: 0,
+        totalBatches: 1,
+        totalPerspectives: 1,
+        totalLLMCalls: 1,
+        successfulLLMCalls: 1,
+        failedBatches: 0,
+      },
+    });
+    const files = [
+      makeDiffFile("lib/main.dart"),
+      makeDiffFile("lib/main.dart"),
+      makeDiffFile("lib/main.dart"),
+    ];
+    const nameMap = new Map([["security", "Security Expert"]]);
+
+    await postReview(
+      octokit,
+      "owner",
+      "repo",
+      1,
+      consolidated,
+      files,
+      false,
+      false,
+      "high",
+      10,
+      nameMap,
+    );
+
+    const createReview = (
+      octokit as unknown as { rest: { pulls: { createReview: ReturnType<typeof vi.fn> } } }
+    ).rest.pulls.createReview;
+    const comments = createReview.mock.calls[0][0].comments as ReviewComment[];
+    expect(comments).toHaveLength(1);
+    expect(comments[0].line).toBe(10);
   });
 });

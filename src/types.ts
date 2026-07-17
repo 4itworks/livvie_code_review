@@ -135,6 +135,7 @@ export interface PipelineConfig {
   reviewInstructions: string;
   requestChangesOnHigh: boolean;
   alwaysRequestChanges: boolean;
+  minConfidence: "low" | "medium" | "high";
   maxComments: number;
   fetchConcurrency: number;
   llmConcurrency: number;

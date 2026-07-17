@@ -61,6 +61,8 @@ function makeConfig(overrides: Partial<PipelineConfig> = {}): PipelineConfig {
     agentModelOverrides: new Map(),
     reviewInstructions: "Review this code carefully",
     requestChangesOnHigh: true,
+    alwaysRequestChanges: false,
+    minConfidence: "low",
     maxComments: 10,
     fetchConcurrency: 5,
     llmConcurrency: 3,
@@ -314,6 +316,7 @@ describe("runPipeline", () => {
       keptFiles,
       config.requestChangesOnHigh,
       config.alwaysRequestChanges,
+      config.minConfidence,
       config.maxComments,
       expectedMap,
     );

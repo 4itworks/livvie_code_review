@@ -6,6 +6,12 @@ import { isSuggestionBalanced } from "./suggestion.js";
 
 const REVIEW_SIGNATURE = "Livvie Code Review";
 
+const CONFIDENCE_ORDER: Record<string, number> = {
+  high: 3,
+  medium: 2,
+  low: 1,
+};
+
 function resolvePerspectiveNames(
   foundBy: string[],
   perspectiveNameMap: Map<string, string>,
@@ -22,12 +28,14 @@ export async function postReview(
   files: DiffFile[],
   requestChangesOnHigh: boolean,
   alwaysRequestChanges: boolean,
+  minConfidence: "low" | "medium" | "high",
   maxComments: number,
   perspectiveNameMap: Map<string, string>,
 ): Promise<number> {
   const { comments, postedFindings } = buildComments(
     consolidated,
     files,
+    minConfidence,
     maxComments,
     perspectiveNameMap,
   );
@@ -106,16 +114,25 @@ export async function postReview(
 function buildComments(
   consolidated: ConsolidatedReview,
   files: DiffFile[],
+  minConfidence: "low" | "medium" | "high",
   maxComments: number,
   perspectiveNameMap: Map<string, string>,
 ): { comments: ReviewComment[]; postedFindings: Set<ReviewFinding> } {
   const comments: ReviewComment[] = [];
   const postedFindings = new Set<ReviewFinding>();
+  const minOrder = CONFIDENCE_ORDER[minConfidence];
 
   for (const finding of consolidated.findings) {
     if (comments.length >= maxComments) {
       core.info(`Reached max-comments limit (${maxComments})`);
       break;
+    }
+
+    if (CONFIDENCE_ORDER[finding.confidence] < minOrder) {
+      core.info(
+        `Skipping inline comment for ${finding.file}:${finding.line} (confidence ${finding.confidence} < ${minConfidence})`,
+      );
+      continue;
     }
 
     const diffFile = files.find((f) => f.filename === finding.file);

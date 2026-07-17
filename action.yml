@@ -48,6 +48,10 @@ inputs:
     description: "Always post REQUEST_CHANGES when any review comment is posted, regardless of severity."
     required: false
     default: "false"
+  min-confidence:
+    description: "Minimum confidence level for findings to be posted as comments. Options: low, medium, high. Findings below this confidence are still summarized and counted at pipeline level but not posted inline."
+    required: false
+    default: "low"
   max-comments:
     description: "Maximum inline comments to post."
     required: false

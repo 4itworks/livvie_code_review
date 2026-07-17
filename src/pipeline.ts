@@ -183,6 +183,7 @@ export async function runPipeline(
     files,
     config.requestChangesOnHigh,
     config.alwaysRequestChanges,
+    config.minConfidence,
     config.maxComments,
     perspectiveNameMap,
   );

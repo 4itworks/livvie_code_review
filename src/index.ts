@@ -22,6 +22,14 @@ function parseStrictlyPositiveInt(value: string, name: string, defaultValue: num
   return parsed;
 }
 
+function parseConfidence(value: string, name: string): "low" | "medium" | "high" {
+  const normalized = (value || "low").toLowerCase();
+  if (normalized === "low" || normalized === "medium" || normalized === "high") {
+    return normalized;
+  }
+  throw new Error(`Invalid value for ${name}: "${value}". Must be one of: low, medium, high.`);
+}
+
 function validateUrl(value: string, name: string): void {
   if (!value || !value.trim()) {
     throw new Error(`Invalid value for ${name}: empty string`);
@@ -146,6 +154,7 @@ async function run(): Promise<void> {
       reviewInstructions,
       requestChangesOnHigh: core.getInput("request-changes-on-high") !== "false",
       alwaysRequestChanges: core.getInput("always-request-changes") === "true",
+      minConfidence: parseConfidence(core.getInput("min-confidence"), "min-confidence"),
       maxComments: parsePositiveInt(core.getInput("max-comments"), "max-comments", 25),
       fetchConcurrency: 5,
       llmConcurrency: 3,
