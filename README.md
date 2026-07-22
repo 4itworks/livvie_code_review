@@ -100,6 +100,7 @@ jobs:
           include-severities: "low,medium,high"
           include-confidences: "low,medium,high"
           request-changes-on: "high"
+          respect-author-replies: "false"
           ignore-patterns: "build/**,dist/**,node_modules/**"
 
           # Debugging
@@ -115,6 +116,7 @@ jobs:
 - [Inputs](#inputs)
 - [Outputs](#outputs)
 - [Cost Control](#cost-control)
+- [Respecting Author Replies](#respecting-author-replies)
 - [Supported Providers](#supported-providers)
 - [Architecture](#architecture)
 - [Development](#development)
@@ -133,6 +135,7 @@ jobs:
 - **Circuit breaker** — automatic fallback to a secondary model if the primary fails
 - **Bring your own LLM** — works with any OpenAI-compatible API (OpenRouter, OpenAI, Groq, Ollama)
 - **Stale review dismissal** — previous reviews from past runs are cleaned up automatically
+- **Author reply respect** — when enabled, the bot reads replies to its inline comments and stops re-requesting changes that the author reasonably explains are not applicable
 
 ## Agent Files
 
@@ -312,6 +315,7 @@ Use `review-instructions-file` (default: `.github/code-reviewer.md`) for project
 | `include-confidences` | no | `low,medium,high` | Comma-separated confidences to include in the review |
 | `request-changes-on` | no | `high` | Comma-separated severities that trigger `REQUEST_CHANGES` |
 | `max-comments` | no | `25` | Max inline comments per review |
+| `respect-author-replies` | no | `false` | When `true`, reads replies to bot inline comments and dismisses findings with reasonable author justifications |
 | `ignore-patterns` | no | `build/**,dist/**,node_modules/**` | Glob patterns for files to skip |
 | `max-batches` | no | `0` | Max batches (0 = unlimited). LLM calls = batches × agents |
 | `context-window` | no | `128000` | Model context window in tokens |
@@ -334,6 +338,21 @@ Two levers control cost:
 - **`max-batches`** — caps file batches. Total LLM calls = `min(batches, max-batches) × num_agents`.
 
 **Example:** `max-batches: "3"` + 2 agent files = at most 6 LLM calls regardless of PR size.
+
+## Respecting Author Replies
+
+When `respect-author-replies: "true"` is set, Livvie reads replies to its own inline comments before posting a new review. If an author explains that a requested change does not apply, and the explanation is reasonable, Livvie dismisses that finding and does not re-request it in the next round.
+
+How it works:
+
+1. Every inline comment Livvie posts contains an invisible marker with a stable finding ID.
+2. On the next run, Livvie fetches replies to those comments.
+3. For each reply, Livvie asks the LLM whether the author's justification is reasonable.
+4. If the LLM agrees, the finding is removed from the new review.
+
+This prevents review loops where the bot keeps re-requesting the same change after the author has already explained why it is not needed.
+
+**Note:** each author reply evaluated costs one additional LLM call.
 
 ## Supported Providers
 
@@ -365,10 +384,14 @@ flowchart LR
         C1["Deduplicate<br/>±3 lines"]
         C2["Sort by severity<br/>cap 100"]
     end
+    subgraph REPLIES["Reply Evaluation (optional)"]
+        R1["Fetch replies<br/>to bot comments"]
+        R2["LLM evaluates<br/>author justifications"]
+    end
     subgraph POST["Post"]
         P1["Single review<br/>inline comments<br/>agent breakdown"]
     end
-    FETCH --> BATCH --> REVIEW --> CONSOL --> POST
+    FETCH --> BATCH --> REVIEW --> CONSOL --> REPLIES --> POST
 ```
 
 **Pipeline stages:**
@@ -377,6 +400,7 @@ flowchart LR
 2. **Batching** — files bin-packed into batches by token budget, with cross-file context per batch
 3. **Review** — each batch × each agent = one LLM call (concurrency 3, circuit breaker with optional fallback model)
 4. **Consolidation** — findings deduplicated (same file + ±3 lines = merged), sorted by severity, capped at 100
+4.5. **Reply Evaluation** (when `respect-author-replies` is enabled) — replies to bot comments are fetched and evaluated; reasonable author justifications dismiss the corresponding findings
 5. **Post** — single consolidated review with inline comments, agent breakdown table, and pipeline stats
 
 The review event (`REQUEST_CHANGES` or `APPROVE`) is determined by the `request-changes-on` input. Any included finding whose severity is in that list causes the review to become `REQUEST_CHANGES`. If no findings match, the review becomes `APPROVE`. Findings that do not match `request-changes-on` are still posted as inline comments, but do not block the PR. Stale reviews from previous runs are dismissed automatically.

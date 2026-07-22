@@ -174,6 +174,7 @@ async function run(): Promise<void> {
       ),
       requestChangesOn: parseLevelList(core.getInput("request-changes-on"), "request-changes-on"),
       maxComments: parsePositiveInt(core.getInput("max-comments"), "max-comments", 25),
+      respectAuthorReplies: core.getInput("respect-author-replies") === "true",
       fetchConcurrency: 5,
       llmConcurrency: 3,
       safetyMargin: parsePositiveInt(core.getInput("safety-margin"), "safety-margin", 500),

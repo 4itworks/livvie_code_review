@@ -64,6 +64,10 @@ inputs:
     description: "Comma-separated list of severities that trigger REQUEST_CHANGES. Use 'low,medium,high' to always request changes."
     required: false
     default: "high"
+  respect-author-replies:
+    description: "When true, the bot reads replies to its inline comments and dismisses findings whose author's justification is reasonable."
+    required: false
+    default: "false"
   ignore-patterns:
     description: "Comma-separated glob patterns for files to skip (e.g. *.g.dart,build/). Defaults to generated file patterns."
     required: false

@@ -91,6 +91,7 @@ describe("isSuggestionBalanced", () => {
 describe("validateSuggestion", () => {
   function makeFinding(overrides: Partial<ReviewFinding>): ReviewFinding {
     return {
+      id: "test-finding-id",
       severity: "medium",
       confidence: "high",
       file: "lib/main.dart",

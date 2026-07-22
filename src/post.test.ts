@@ -17,6 +17,7 @@ import type { ReviewFinding, ConsolidatedReview, DiffFile, PerspectiveSummary } 
 
 function makeFinding(overrides: Partial<ReviewFinding> = {}): ReviewFinding {
   return {
+    id: "test-finding-id",
     severity: "medium",
     confidence: "high",
     file: "lib/main.dart",
@@ -176,6 +177,7 @@ describe("formatCommentBody", () => {
 
   it("renders severity badge and confidence icon", () => {
     const finding = makeFinding({
+      id: "finding-xyz",
       severity: "high",
       confidence: "low",
     });
@@ -184,6 +186,7 @@ describe("formatCommentBody", () => {
     expect(body).toContain("🔴");
     expect(body).toContain("❓");
     expect(body).toContain("HIGH");
+    expect(body).toContain("<!-- livvie:finding-id:finding-xyz -->");
   });
 
   it("renders suggestion as suggestion code block when balanced", () => {

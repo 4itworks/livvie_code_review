@@ -314,12 +314,16 @@ export function normalizeFinding(
     ? (raw.confidence as "high" | "medium" | "low")
     : "medium";
 
+  const file = String(raw.file || "").trim();
+  const description = String(raw.description || "").trim();
+
   const normalized: ReviewFinding = {
+    id: generateFindingId(file, line, description),
     severity,
     confidence,
-    file: String(raw.file || "").trim(),
+    file,
     line,
-    description: String(raw.description || "").trim(),
+    description,
     suggestion: hasSuggestion ? String(raw.suggestion).trim() : null,
     suggestionStartLine,
     perspective: perspectiveId,
@@ -327,6 +331,15 @@ export function normalizeFinding(
   };
 
   return validateSuggestion(normalized);
+}
+
+export function generateFindingId(file: string, line: number, description: string): string {
+  const normalized = `${file}:${line}:${description.toLowerCase().replace(/\s+/g, " ").trim()}`;
+  let hash = 5381;
+  for (let i = 0; i < normalized.length; i++) {
+    hash = (hash << 5) + hash + normalized.charCodeAt(i);
+  }
+  return Math.abs(hash).toString(36).slice(0, 12);
 }
 
 export function isValidFinding(f: ReviewFinding): boolean {
