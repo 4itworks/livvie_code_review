@@ -261,6 +261,7 @@ describe("normalizeFinding", () => {
 // ---------------------------------------------------------------------------
 describe("isValidFinding", () => {
   const make = (overrides: Partial<ReviewFinding>): ReviewFinding => ({
+    id: "test-id",
     severity: "low",
     confidence: "medium",
     file: "a.ts",

@@ -7,6 +7,7 @@ export interface DiffFile {
 }
 
 export interface ReviewFinding {
+  id: string;
   severity: "high" | "medium" | "low";
   confidence: "high" | "medium" | "low";
   file: string;
@@ -137,6 +138,7 @@ export interface PipelineConfig {
   includeConfidences: Set<"low" | "medium" | "high">;
   requestChangesOn: Set<"low" | "medium" | "high">;
   maxComments: number;
+  respectAuthorReplies: boolean;
   fetchConcurrency: number;
   llmConcurrency: number;
   safetyMargin: number;

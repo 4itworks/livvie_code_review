@@ -5,6 +5,7 @@ import { isLineInDiff } from "./diff.js";
 import { isSuggestionBalanced } from "./suggestion.js";
 
 const REVIEW_SIGNATURE = "Livvie Code Review";
+export const FINDING_ID_MARKER = "livvie:finding-id";
 
 function resolvePerspectiveNames(
   foundBy: string[],
@@ -190,6 +191,8 @@ export function formatCommentBody(
 
   parts.push("");
   parts.push(`— ${attribution}`);
+  parts.push("");
+  parts.push(`<!-- ${FINDING_ID_MARKER}:${finding.id} -->`);
 
   return parts.join("\n");
 }
